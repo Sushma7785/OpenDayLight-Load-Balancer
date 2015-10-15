@@ -21,6 +21,8 @@ public class LBConst {
 
     public static final String RANDOM_LB_METHOD = "random";
 
+    public static final String ANT_LB_METHOD = "ant";
+
     public static final String STATUS_ACTIVE="active";
 
     public static final String STATUS_INACTIVE="inactive";

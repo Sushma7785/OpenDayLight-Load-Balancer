@@ -52,6 +52,7 @@ import org.opendaylight.controller.samples.loadbalancer.entities.Client;
 import org.opendaylight.controller.samples.loadbalancer.entities.Pool;
 import org.opendaylight.controller.samples.loadbalancer.entities.PoolMember;
 import org.opendaylight.controller.samples.loadbalancer.entities.VIP;
+import org.opendaylight.controller.samples.loadbalancer.policies.AntLBPolicy;
 import org.opendaylight.controller.samples.loadbalancer.policies.RandomLBPolicy;
 import org.opendaylight.controller.samples.loadbalancer.policies.RoundRobinLBPolicy;
 import org.slf4j.Logger;
@@ -110,6 +111,11 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
      * Random policy instance.
      */
     private static RandomLBPolicy ranLBMethod = new RandomLBPolicy(configManager);
+
+    /*
+     * AntLB policy instance.
+     */
+    private static AntLBPolicy antLBMethod = new AntLBPolicy(configManager);
 
     /*
      * Reference to the data packet service
@@ -245,6 +251,11 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
                         if (configManager.getPool(vipWithPoolName.getPoolName()).getLbMethod()
                                 .equalsIgnoreCase(LBConst.RANDOM_LB_METHOD)) {
                             poolMemberIp = ranLBMethod.getPoolMemberForClient(client, vipWithPoolName);
+                        }
+
+                        if(configManager.getPool(vipWithPoolName.getPoolName()).getLbMethod()
+                                .equalsIgnoreCase(LBConst.ANT_LB_METHOD)) {
+                            poolMemberIp = antLBMethod.getPoolMemberForClient(client, vipWithPoolName);
                         }
 
                         try {
