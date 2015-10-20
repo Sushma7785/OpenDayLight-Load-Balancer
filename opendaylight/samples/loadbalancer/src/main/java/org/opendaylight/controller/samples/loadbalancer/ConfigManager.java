@@ -82,6 +82,7 @@ public class ConfigManager implements IConfigManager{
         }
 
         //Yeah, i have it.
+        cmLogger.info("Already there !!");
         return true;
     }
 
@@ -124,7 +125,7 @@ public class ConfigManager implements IConfigManager{
         vip.setStatus(LBConst.STATUS_ACTIVE);
         this.vips.put(name, vip);
 
-        cmLogger.trace("New VIP created : "+vip.toString());
+        cmLogger.info("New VIP created : "+vip.toString());
         return vip;
     }
 

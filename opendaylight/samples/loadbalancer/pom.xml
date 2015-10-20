@@ -36,6 +36,10 @@
       <groupId>org.opendaylight.controller</groupId>
       <artifactId>topologymanager</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.opendaylight.controller.thirdparty</groupId>
+      <artifactId>net.sf.jung2</artifactId>
+    </dependency>
   </dependencies>
 
   <build>
@@ -52,6 +56,9 @@
               org.opendaylight.controller.samples.loadbalancer.policies</Export-Package>
             <Import-Package>org.opendaylight.controller.sal.core,
               org.opendaylight.controller.sal.utils,
+              edu.uci.ics.jung.graph,
+              edu.uci.ics.jung.algorithms.shortestpath,
+              edu.uci.ics.jung.graph.util,
               org.opendaylight.controller.sal.action,
               org.opendaylight.controller.sal.match,
               org.opendaylight.controller.sal.packet,

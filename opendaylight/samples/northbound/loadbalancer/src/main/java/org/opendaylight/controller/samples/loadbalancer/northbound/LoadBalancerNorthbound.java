@@ -204,7 +204,7 @@ public class LoadBalancerNorthbound {
         @ResponseCode(code = 201, condition = "VIP created successfully"),
         @ResponseCode(code = 404, condition = "The Container Name not found"),
         @ResponseCode(code = 503, condition = "Load balancer service is unavailable"),
-        @ResponseCode(code = 409, condition = "VIP already exist"),
+        @ResponseCode(code = 409, condition = "VIP already exist Already created"),
         @ResponseCode(code = 415, condition = "Invalid input data")})
     public Response addVIP(@PathParam("containerName") String containerName,
             @TypeHint(VIP.class) VIP inVIP){

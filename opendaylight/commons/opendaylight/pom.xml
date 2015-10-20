@@ -2255,7 +2255,7 @@
                     </execute>
                   </action>
                 </pluginExecution>
-                <pluginExecution>
+                <!--pluginExecution>
                   <pluginExecutionFilter>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-checkstyle-plugin</artifactId>
@@ -2267,7 +2267,7 @@
                   <action>
                     <ignore></ignore>
                   </action>
-                </pluginExecution>
+                </pluginExecution-->
                 <pluginExecution>
                   <pluginExecutionFilter>
                     <groupId>org.opendaylight.yangtools</groupId>
@@ -2391,7 +2391,7 @@
       </plugins>
     </pluginManagement>
     <plugins>
-      <plugin>
+      <!--plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-checkstyle-plugin</artifactId>
         <version>${checkstyle.version}</version>
@@ -2419,7 +2419,7 @@
             <phase>process-sources</phase>
           </execution>
         </executions>
-      </plugin>
+      </plugin-->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-enforcer-plugin</artifactId>

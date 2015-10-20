@@ -21,6 +21,8 @@ import org.opendaylight.controller.sal.packet.IDataPacketService;
 import org.opendaylight.controller.sal.packet.IListenDataPacket;
 import org.opendaylight.controller.sal.routing.IRouting;
 import org.opendaylight.controller.samples.loadbalancer.IConfigManager;
+import org.opendaylight.controller.switchmanager.ISwitchManager;
+import org.opendaylight.controller.topologymanager.ITopologyManager;
 
 /**
  * Main application activator class for registering the dependencies and
@@ -88,6 +90,16 @@ public class Activator extends ComponentActivatorAbstractBase {
             c.add(createContainerServiceDependency(containerName).setService(
                     IForwardingRulesManager.class).setCallbacks(
                     "setForwardingRulesManager", "unsetForwardingRulesManager")
+                    .setRequired(true));
+            
+            c.add(createContainerServiceDependency(containerName).setService(
+                    ITopologyManager.class).setCallbacks(
+                    "setTopo", "unsetTopo")
+                    .setRequired(true));
+            
+            c.add(createContainerServiceDependency(containerName).setService(
+                    ISwitchManager.class).setCallbacks(
+                    "setSwitch", "unsetSwitch")
                     .setRequired(true));
         }
     }
