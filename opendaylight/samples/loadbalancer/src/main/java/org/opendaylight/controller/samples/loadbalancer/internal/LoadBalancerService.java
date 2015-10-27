@@ -11,11 +11,7 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Dictionary;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import org.apache.felix.dm.Component;
@@ -31,9 +27,7 @@ import org.opendaylight.controller.sal.action.SetDlDst;
 import org.opendaylight.controller.sal.action.SetDlSrc;
 import org.opendaylight.controller.sal.action.SetNwDst;
 import org.opendaylight.controller.sal.action.SetNwSrc;
-import org.opendaylight.controller.sal.core.Edge;
 import org.opendaylight.controller.sal.core.Node;
-import org.opendaylight.controller.sal.core.Node.NodeIDType;
 import org.opendaylight.controller.sal.core.NodeConnector;
 import org.opendaylight.controller.sal.core.Path;
 import org.opendaylight.controller.sal.flowprogrammer.Flow;
@@ -58,16 +52,13 @@ import org.opendaylight.controller.samples.loadbalancer.entities.Client;
 import org.opendaylight.controller.samples.loadbalancer.entities.Pool;
 import org.opendaylight.controller.samples.loadbalancer.entities.PoolMember;
 import org.opendaylight.controller.samples.loadbalancer.entities.VIP;
-import org.opendaylight.controller.samples.loadbalancer.policies.AntLBPolicy;
 import org.opendaylight.controller.samples.loadbalancer.policies.RandomLBPolicy;
 import org.opendaylight.controller.samples.loadbalancer.policies.RoundRobinLBPolicy;
 import org.opendaylight.controller.switchmanager.ISwitchManager;
 import org.opendaylight.controller.topologymanager.ITopologyManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import edu.uci.ics.jung.graph.Graph;
-import edu.uci.ics.jung.graph.DirectedSparseGraph;;
-//import edu.uci.ics.jung.graph.event.GraphEvent.Edge;
+
 
 /**
  * This class is the main class that represents the load balancer service. This
@@ -167,11 +158,7 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
      * Name of the container where this application will register.
      */
     private String containerName = null;
-    /*
-     *  network graph
-     */
-    Graph<Node, Edge> networkGraph = null;
-
+    
     /*
      * Set/unset methods for the service instance that load balancer service
      * requires
@@ -258,15 +245,12 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
      */
     @Override
     public PacketResult receiveDataPacket(RawPacket inPkt) {
-    	lbsLogger.info("All edges: " + topo.getEdges().keySet().toString());
     	
-    	addLinks();
         if (inPkt == null) {
             return PacketResult.IGNORED;
         }
 
         Packet formattedPak = this.dataPacketService.decodeDataPacket(inPkt);
-        lbsLogger.info("Testingg");
 
         if (formattedPak instanceof Ethernet) {
             byte[] vipMacAddr = ((Ethernet) formattedPak).getDestinationMACAddress();
@@ -274,8 +258,6 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
 
             if (ipPkt instanceof IPv4) {
 
-                lbsLogger.info("Packet recieved from switch : {}", inPkt.getIncomingNodeConnector().getNode()
-                        .toString());
                 IPv4 ipv4Pkt = (IPv4) ipPkt;
                 if (IPProtocols.getProtocolName(ipv4Pkt.getProtocol()).equals(IPProtocols.TCP.toString())
                         || IPProtocols.getProtocolName(ipv4Pkt.getProtocol()).equals(IPProtocols.UDP.toString())) {
@@ -293,8 +275,7 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
                         }
                         if (configManager.getPool(vipWithPoolName.getPoolName()).getLbMethod()
                                 .equalsIgnoreCase(LBConst.ROUND_ROBIN_LB_METHOD)) {
-
-                            poolMemberIp = rrLBMethod.getPoolMemberForClient(client, vipWithPoolName);
+                        	poolMemberIp = rrLBMethod.getPoolMemberForClient(client, vipWithPoolName);
                         }
 
                         if (configManager.getPool(vipWithPoolName.getPoolName()).getLbMethod()
@@ -304,8 +285,10 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
 
                         if(configManager.getPool(vipWithPoolName.getPoolName()).getLbMethod()
                                 .equalsIgnoreCase(LBConst.ANT_LB_METHOD)) {
-                        	lbsLogger.info("antLB called");
                         	
+	                        lbsLogger.info("calling initialization for " + this + " and antLBMethod " + LoadBalancerService.antLBMethod);
+	                  		antLBMethod.initialize(topo,hostTracker,switchManager);
+                    
                             poolMemberIp = antLBMethod.getPoolMemberForClient(client, vipWithPoolName);
                         }
 
@@ -373,134 +356,8 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
     }
 
     
-    boolean graphInit = false;
     
-    
-    private void addLinks() {
-    	if(!graphInit){
-    		networkGraph = new DirectedSparseGraph<Node, Edge>();
-    		Set<Edge> edgeSet = topo.getEdges().keySet();
-    		Node src = null;
-    		Node src1 = null;
-    		int count = 1;
-        	for(Edge e : edgeSet) {
-        		if(count == 1) {
-        			src1 = e.getTailNodeConnector().getNode();
-        			count++;
-        		}
-        		src = e.getTailNodeConnector().getNode();
-        		Node dst = e.getHeadNodeConnector().getNode();
-        		networkGraph.addVertex(src);
-        		networkGraph.addVertex(dst);
-        		networkGraph.addEdge(e, src, dst);
-        	}
-        	lbsLogger.info("count is: " + networkGraph.getEdgeCount() );
-	    	graphInit = true;
-	    	Node dst1 = null;
-	    	for(Edge e : edgeSet) {
-        		//Node src = e.getTailNodeConnector().getNode();
-        		dst1 = e.getHeadNodeConnector().getNode();
-        		
-	    	}
-	    	lbsLogger.info("src is: " + src1 + " " + "dst is: " + dst1);
-	    	getPaths(src1, dst1);
-    	}
-	}
-
-	private void getPaths(Node src, Node dst) {
-		Set<List<Edge>> allPathsDiscovered = getAllPaths(src,dst,topo.getEdges().keySet(), switchManager.getNodes());
-		
-		lbsLogger.info("All Paths : " + allPathsDiscovered.toString());
-		
-		getPathUtilization(allPathsDiscovered);
-		
-	}
-
-	private void getPathUtilization(Set<List<Edge>> allPathsDiscovered) {
-		Iterator i = allPathsDiscovered.iterator();
-		List<Edge> path1 = (List<Edge>) i.next();
-		int sumUtil = 0;
-		int count = 0;
-		for(Edge e : path1) {
-			//sumUtil = sumUtil + getUtil(e.getTailNodeConnector());
-			count ++;
-		}
-		float totalUtil = sumUtil/count;
-	}
-
-	private Set<List<Edge>> getAllPaths(Node srcNode, Node dstNode, Set<Edge> allLinks, Set<Node> allNodes) {
-		
-		// The new paths from srcNode to dstNode.
-        Set<List<Edge>> allPaths = new HashSet<List<Edge>>();
-        // Clone the available links such that we can modify them.
-        Set<Edge> availableLinks = new HashSet<Edge>();
-        availableLinks.addAll(allLinks);
-        // Clone the visited nodes such that we can modify them.
-        Set<Node> visitedNodes = new HashSet<Node>();
-        visitedNodes.addAll(allNodes);
-
-        // Just to make sure the first node is in the visited nodes list.
-        if (!visitedNodes.contains(srcNode)) {
-            allNodes.add(srcNode);
-            visitedNodes.add(srcNode);
-        }
-
-        // For all links that originate at the source node.
-        for (Edge link : networkGraph.getOutEdges(srcNode)) {
-            List<Edge> currentPath = new ArrayList<Edge>();
-
-            if (!availableLinks.contains(link))
-                continue;
-
-            Node nextNode = link.getHeadNodeConnector().getNode();
-
-            if (nextNode == dstNode) {
-                currentPath.add(link);
-                allPaths.add(currentPath);
-            } else {
-                availableLinks.remove(link);
-                visitedNodes.add(nextNode);
-                Set<List<Edge>> nextPaths = getAllPaths(nextNode,
-                        dstNode, availableLinks, visitedNodes);
-
-                for (List<Edge> path : nextPaths) {
-                    if (path.isEmpty())
-                        continue;
-                    currentPath.add(link);
-                    currentPath.addAll(path);
-                    allPaths.add(new ArrayList<Edge>(currentPath));
-                    currentPath.clear();
-                }
-            }
-        }
-
-        return allPaths;
-    }
-
-	private void localUpdate() {
-		Set<HostNodeConnector> allHosts = hostTracker.getAllHosts();
-		HashMap<String, IP> serverObj = new HashMap<String, IP>();
-		Node srcNode = null;
-		for(HostNodeConnector hc : allHosts) {
-				if(hc.getNetworkAddressAsString().equals("10.0.0.1")) {
-					srcNode = hc.getnodeconnectorNode();
-					allHosts.remove(hc);
-				}
-			}
-		for(HostNodeConnector hc : allHosts) {
-			Node dstNode = hc.getnodeconnectorNode();
-			IP obj = new IP(hc.getNetworkAddressAsString());
-			serverObj.put(obj.IPaddress, obj);
-			Set<List<Edge>> paths= getAllPaths(srcNode, dstNode, topo.getEdges().keySet(), switchManager.getNodes());
-			int pathID = 1;
-			float initialPheromoneValue = (float) 0.1;
-			for (List<Edge> path : paths) {
-				obj.pheromoneMatrix.put(pathID++, new PathList(path,initialPheromoneValue)); 
-			}				
-		}
-		
-	}
-
+   
 	/*
      * This method installs the flow rule for routing the traffic between two
      * hosts.
