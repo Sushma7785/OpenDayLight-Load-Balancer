@@ -288,8 +288,7 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
                         	
 	                        lbsLogger.info("calling initialization for " + this + " and antLBMethod " + LoadBalancerService.antLBMethod);
 	                  		antLBMethod.initialize(topo,hostTracker,switchManager);
-                    
-                            poolMemberIp = antLBMethod.getPoolMemberForClient(client, vipWithPoolName);
+	                  		poolMemberIp = antLBMethod.getPoolMemberForClient(client, vipWithPoolName);
                         }
 
                         try {

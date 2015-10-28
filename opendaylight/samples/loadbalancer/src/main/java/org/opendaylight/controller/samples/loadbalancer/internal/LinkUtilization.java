@@ -30,10 +30,12 @@ public class LinkUtilization implements Runnable {
     public void init() {
         linkDataRate = new ConcurrentHashMap<Edge, Double>();
         linkBytesTransferred = new ConcurrentHashMap<Edge, Long>();
+        Linklog.info("initialized");
     }
-
+    
+    @Override
     public void run() {
-
+    	Linklog.info("running");
         long thisDataRateTimestamp = System.currentTimeMillis();
 
         try {
@@ -47,11 +49,11 @@ public class LinkUtilization implements Runnable {
                     .getGlobalInstance(IStatisticsManager.class, this);
 
             if(topologyManager == null || statisticsManager == null) {
-                Linklog.error("CalculateDataRates: topology or statistics Manager is null!");
+                Linklog.info("CalculateDataRates: topology or statistics Manager is null!");
                 return;
             }
             if(linkDataRate == null || linkBytesTransferred == null) {
-                Linklog.error("CalculateDataRates: linkDataRate or linkBytesTransferred maps are null");
+                Linklog.info("CalculateDataRates: linkDataRate or linkBytesTransferred maps are null");
                 return;
             }
             Map<Edge, Set<Property>> edgeTopology = topologyManager.getEdges();
@@ -90,6 +92,7 @@ public class LinkUtilization implements Runnable {
         }
 
         lastDataRateTimestamp = thisDataRateTimestamp;
+        
     }
 
     public Map<Edge,Double> getEdgeDataRates() {

@@ -123,14 +123,17 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 	private void initMatrix(ITopologyManager topo, IfIptoHost hostTracker) {
 		Set<HostNodeConnector> allHosts = hostTracker.getAllHosts();
 		HashMap<String, IP> serverObj = new HashMap<String, IP>();
+		HostNodeConnector srcHost = null;
 		Node srcNode = null;
+		HostNodeConnector toRemove = null;
 		for(HostNodeConnector hc : allHosts) {
 			if(hc.getNetworkAddressAsString().equals("10.0.0.1")) {
-				srcNode = hc.getnodeconnectorNode();
-				antLogger.info(srcNode + " " + hc.getNetworkAddressAsString());
-				allHosts.remove(hc);
+				srcHost = hc;
+				srcNode = hc.getnodeConnector().getNode();
+				toRemove = hc;				
 			}
 		}
+		allHosts.remove(toRemove);
 		antLogger.info("testingg");
 		antLogger.info("No of servers: " + allHosts.size());
 		for(HostNodeConnector hc : allHosts) {
@@ -139,7 +142,8 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 			IP obj = new IP(hc.getNetworkAddressAsString());
 			Set<Node> allNodes = new HashSet<Node>();
 			antLogger.info("Get allpaths called");
-			Set<List<Edge>> paths= getAllPaths(srcNode, dstNode, topo.getEdges().keySet(), allNodes);
+			Set<List<Edge>> paths = getAllPaths(srcNode, dstNode, topo.getEdges().keySet(), allNodes);
+			antLogger.info("No of paths returned: " + paths.size());
 			int pathID = 1;
 			float initialPheromoneValue = (float) 0.1;
 			for (List<Edge> path : paths) {
@@ -147,17 +151,20 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 			}
 			serverObj.put(obj.IPaddress, obj);
 		}
-
+		
 		Iterator<String> i = serverObj.keySet().iterator();
 		antLogger.info("Number of server: " + serverObj.size());
 		while(i.hasNext()) {
 			IP obj = serverObj.get(i.next());
+			antLogger.info(obj.IPaddress);
 			Map<Integer, PathList> pheromoneMatrix = obj.pheromoneMatrix;
 			Iterator<Integer> i1 = pheromoneMatrix.keySet().iterator();
+			antLogger.info("Matrix size : " + pheromoneMatrix.size());
 			while(i1.hasNext()) {
-				antLogger.info(pheromoneMatrix.get(i1).path.toString());
+				int pathno = i1.next() ;
+				antLogger.info( pathno+ " " + pheromoneMatrix.get(pathno).path.toString());
 			}
-		}
+		} 
 		/*String ipOfServerSelected = "10.0.0.3";
 		IP main = serverObj.get(ipOfServerSelected);
 		float min = 999;
@@ -173,6 +180,8 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 	}
 
 	private Set<List<Edge>> getAllPaths(Node srcNode, Node dstNode, Set<Edge> allLinks, Set<Node> allNodes) {
+		antLogger.info("Src - Dst "+ srcNode + ":" + dstNode);
+		antLogger.info("Edges size checking == : " + allLinks.size());
 		// The new paths from srcNode to dstNode.
 		Set<List<Edge>> allPaths = new HashSet<List<Edge>>();
 		// Clone the available links such that we can modify them.
@@ -191,6 +200,7 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 		// For all links that originate at the source node.
 		for (Edge link : networkGraph.getOutEdges(srcNode)) {
 			List<Edge> currentPath = new ArrayList<Edge>();
+			
 			if (!availableLinks.contains(link))
 				continue;
 
@@ -200,7 +210,8 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 				continue;
 			}
 
-			if (nextNode == dstNode) {
+			if (nextNode.equals(dstNode) ) {
+				antLogger.info("reached destination");
 				currentPath.add(link);
 				allPaths.add(currentPath);
 			} else {
