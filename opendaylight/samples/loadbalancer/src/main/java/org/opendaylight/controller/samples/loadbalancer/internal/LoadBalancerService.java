@@ -27,6 +27,7 @@ import org.opendaylight.controller.sal.action.SetDlDst;
 import org.opendaylight.controller.sal.action.SetDlSrc;
 import org.opendaylight.controller.sal.action.SetNwDst;
 import org.opendaylight.controller.sal.action.SetNwSrc;
+import org.opendaylight.controller.sal.core.Edge;
 import org.opendaylight.controller.sal.core.Node;
 import org.opendaylight.controller.sal.core.NodeConnector;
 import org.opendaylight.controller.sal.core.Path;
@@ -54,6 +55,7 @@ import org.opendaylight.controller.samples.loadbalancer.entities.PoolMember;
 import org.opendaylight.controller.samples.loadbalancer.entities.VIP;
 import org.opendaylight.controller.samples.loadbalancer.policies.RandomLBPolicy;
 import org.opendaylight.controller.samples.loadbalancer.policies.RoundRobinLBPolicy;
+import org.opendaylight.controller.statisticsmanager.IStatisticsManager;
 import org.opendaylight.controller.switchmanager.ISwitchManager;
 import org.opendaylight.controller.topologymanager.ITopologyManager;
 import org.slf4j.Logger;
@@ -150,6 +152,11 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
     private ISwitchManager switchManager;
     
     /*
+     * Reference for statistics service
+     */
+    private IStatisticsManager statManager;
+    
+    /*
      * Load balancer application installs all flows with priority 2.
      */
     private static short LB_IPSWITCH_PRIORITY = 2;
@@ -231,6 +238,16 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
             this.switchManager = null;
         }
     }
+    
+    public void setStat(IStatisticsManager statManager) {
+        this.statManager = statManager;
+    }
+
+    public void unsetStat(IStatisticsManager statManager) {
+        if (this.statManager == statManager) {
+            this.statManager = null;
+        }
+    }
 
     /**
      * This method receives first packet of flows for which there is no matching
@@ -288,64 +305,73 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
                         	
 	                        lbsLogger.info("calling initialization for " + this + " and antLBMethod " + LoadBalancerService.antLBMethod);
 	                  		antLBMethod.initialize(topo,hostTracker,switchManager);
-	                  		poolMemberIp = antLBMethod.getPoolMemberForClient(client, vipWithPoolName);
+	                  		//List<Edge> path = antLBMethod.getFinalPath(client, vipWithPoolName);
                         }
-
-                        try {
-
-                            Node clientNode = inPkt.getIncomingNodeConnector().getNode();
-                            // HostTracker hosts db key scheme implementation
-                            IHostId id = HostIdFactory.create(InetAddress.getByName(poolMemberIp), null);
-                            HostNodeConnector hnConnector = this.hostTracker.hostFind(id);
-
-                            Node destNode = hnConnector.getnodeconnectorNode();
-
-                            lbsLogger.debug("Client is connected to switch : {}", clientNode.toString());
-                            lbsLogger
-                                    .debug("Destination pool machine is connected to switch : {}", destNode.toString());
-
-                            // Get path between both the nodes
-                            NodeConnector forwardPort = null;
-
-                            if (clientNode.getNodeIDString().equals(destNode.getNodeIDString())) {
-
-                                forwardPort = hnConnector.getnodeConnector();
-
-                                lbsLogger
-                                        .trace("Both source (client) and destination pool machine is connected to same switch nodes. Respective ports are - {},{}",
-                                                forwardPort, inPkt.getIncomingNodeConnector());
-
-                            } else {
-
-                                Path route = this.routing.getRoute(clientNode, destNode);
-
-                                lbsLogger.trace("Path between source (client) and destination switch nodes : {}",
-                                        route.toString());
-
-                                forwardPort = route.getEdges().get(0).getTailNodeConnector();
-
-                            }
-
-                            if (installLoadBalancerFlow(client, vip, clientNode, poolMemberIp,
-                                    hnConnector.getDataLayerAddressBytes(), forwardPort,
-                                    LBConst.FORWARD_DIRECTION_LB_FLOW)) {
-                                lbsLogger.trace("Traffic from client : {} will be routed " + "to pool machine : {}",
-                                        client, poolMemberIp);
-                            } else {
-                                lbsLogger.error("Not able to route traffic from client : {}", client);
-                            }
-
-                            if (installLoadBalancerFlow(client, vip, clientNode, poolMemberIp, vipMacAddr,
-                                    inPkt.getIncomingNodeConnector(), LBConst.REVERSE_DIRECTION_LB_FLOW)) {
-                                lbsLogger.trace("Flow rule installed to change the source ip/mac from "
-                                        + "pool machine ip {} to VIP {} for traffic coming pool machine", poolMemberIp,
-                                        vip);
-                            } else {
-                                lbsLogger.error("Not able to route traffic from client : {}", client);
-                            }
-                        } catch (UnknownHostException e) {
-                            lbsLogger.error("Pool member not found  in the network : {}", e.getMessage());
-                            lbsLogger.error("", e);
+                        
+                        if (configManager.getPool(vipWithPoolName.getPoolName()).getLbMethod()
+                                .equalsIgnoreCase(LBConst.ROUND_ROBIN_LB_METHOD) || configManager.getPool(vipWithPoolName.getPoolName()).getLbMethod()
+                                .equalsIgnoreCase(LBConst.RANDOM_LB_METHOD)) {
+			
+			                try {
+			
+			                    Node clientNode = inPkt.getIncomingNodeConnector().getNode();
+			                    // HostTracker hosts db key scheme implementation
+			                    IHostId id = HostIdFactory.create(InetAddress.getByName(poolMemberIp), null);
+			                    HostNodeConnector hnConnector = this.hostTracker.hostFind(id);
+			
+			                    Node destNode = hnConnector.getnodeconnectorNode();
+			
+			                    lbsLogger.debug("Client is connected to switch : {}", clientNode.toString());
+			                    lbsLogger
+			                            .debug("Destination pool machine is connected to switch : {}", destNode.toString());
+			
+			                    // Get path between both the nodes
+			                    NodeConnector forwardPort = null;
+			
+			                    if (clientNode.getNodeIDString().equals(destNode.getNodeIDString())) {
+			
+			                        forwardPort = hnConnector.getnodeConnector();
+			
+			                        lbsLogger
+			                                .trace("Both source (client) and destination pool machine is connected to same switch nodes. Respective ports are - {},{}",
+			                                        forwardPort, inPkt.getIncomingNodeConnector());
+			
+			                    } else {
+			
+			                        Path route = this.routing.getRoute(clientNode, destNode);
+			
+			                        lbsLogger.trace("Path between source (client) and destination switch nodes : {}",
+			                                route.toString());
+			
+			                        forwardPort = route.getEdges().get(0).getTailNodeConnector();
+			
+			                    }
+			
+			                    if (installLoadBalancerFlow(client, vip, clientNode, poolMemberIp,
+			                            hnConnector.getDataLayerAddressBytes(), forwardPort,
+			                            LBConst.FORWARD_DIRECTION_LB_FLOW)) {
+			                        lbsLogger.trace("Traffic from client : {} will be routed " + "to pool machine : {}",
+			                                client, poolMemberIp);
+			                    } else {
+			                        lbsLogger.error("Not able to route traffic from client : {}", client);
+			                    }
+			
+			                    if (installLoadBalancerFlow(client, vip, clientNode, poolMemberIp, vipMacAddr,
+			                            inPkt.getIncomingNodeConnector(), LBConst.REVERSE_DIRECTION_LB_FLOW)) {
+			                        lbsLogger.trace("Flow rule installed to change the source ip/mac from "
+			                                + "pool machine ip {} to VIP {} for traffic coming pool machine", poolMemberIp,
+			                                vip);
+			                    } else {
+			                        lbsLogger.error("Not able to route traffic from client : {}", client);
+			                    }
+			                } catch (UnknownHostException e) {
+			                    lbsLogger.error("Pool member not found  in the network : {}", e.getMessage());
+			                    lbsLogger.error("", e);
+			                }
+                        } 
+                        if(configManager.getPool(vipWithPoolName.getPoolName()).getLbMethod()
+                                .equalsIgnoreCase(LBConst.ANT_LB_METHOD)) {
+                        		
                         }
                     }
                 }

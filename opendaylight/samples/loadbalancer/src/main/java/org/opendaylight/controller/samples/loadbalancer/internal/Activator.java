@@ -21,6 +21,7 @@ import org.opendaylight.controller.sal.packet.IDataPacketService;
 import org.opendaylight.controller.sal.packet.IListenDataPacket;
 import org.opendaylight.controller.sal.routing.IRouting;
 import org.opendaylight.controller.samples.loadbalancer.IConfigManager;
+import org.opendaylight.controller.statisticsmanager.IStatisticsManager;
 import org.opendaylight.controller.switchmanager.ISwitchManager;
 import org.opendaylight.controller.topologymanager.ITopologyManager;
 
@@ -101,6 +102,11 @@ public class Activator extends ComponentActivatorAbstractBase {
                     ISwitchManager.class).setCallbacks(
                     "setSwitch", "unsetSwitch")
                     .setRequired(true));
+            
+            c.add(createContainerServiceDependency(containerName).setService(
+                    IStatisticsManager.class).setCallbacks(
+                    "setStat", "unsetStat")
+                    .setRequired(false));
         }
     }
 

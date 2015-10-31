@@ -7,20 +7,26 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Phaser;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import org.eclipse.core.runtime.internal.stats.StatsManager;
 import org.opendaylight.controller.hosttracker.IfIptoHost;
 import org.opendaylight.controller.hosttracker.hostAware.HostNodeConnector;
 import org.opendaylight.controller.sal.core.Edge;
 import org.opendaylight.controller.sal.core.Node;
+import org.opendaylight.controller.sal.core.Path;
+import org.opendaylight.controller.sal.utils.ServiceHelper;
 import org.opendaylight.controller.samples.loadbalancer.ConfigManager;
 import org.opendaylight.controller.samples.loadbalancer.entities.Client;
 import org.opendaylight.controller.samples.loadbalancer.entities.PoolMember;
 import org.opendaylight.controller.samples.loadbalancer.entities.VIP;
 import org.opendaylight.controller.samples.loadbalancer.policies.ILoadBalancingPolicy;
+import org.opendaylight.controller.statisticsmanager.IStatisticsManager;
 import org.opendaylight.controller.switchmanager.ISwitchManager;
 import org.opendaylight.controller.topologymanager.ITopologyManager;
 import org.slf4j.Logger;
@@ -67,6 +73,7 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 	 * Reference for Switch service
 	 */
 	private ISwitchManager switchManager;
+	
 	/*
 	 * Boolean value to store initialization 
 	 */
@@ -79,13 +86,40 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 	 * Reference for Link Utilization class
 	 */
 	private LinkUtilization linkUtilCalculate;
+	/*
+	 * List of server objects
+	 */
+	private static ConcurrentHashMap<String, IP> serverObj = new ConcurrentHashMap<String, IP>();
+	/*
+	 * Local evaporation rate
+	 */
+	final float localEvap = (float) 0.5;
+	/*
+	 * Initial Local update value
+	 */
+	final float localInit = (float) 0.1;
+	/*
+	 * value of alpha
+	 */
+	final float alpha = (float) 0.5;
+	/*
+	 * value of beta
+	 */
+	final float beta = (float) 0.5;
+	/*
+	 * Value of Q
+	 */
+	final int Q = 1;
+	/*
+	 * Number of iterations for Global Update
+	 */
+	static int i = 0; 
 
 	@SuppressWarnings("unused")
 	private AntLBPolicy(){}
 
 	public AntLBPolicy(ConfigManager cmgr){
 		this.cmgr = cmgr;
-		this.clientMemberMap = new HashMap<Client, PoolMember>();
 	}
 
 
@@ -122,28 +156,25 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 	
 	private void initMatrix(ITopologyManager topo, IfIptoHost hostTracker) {
 		Set<HostNodeConnector> allHosts = hostTracker.getAllHosts();
-		HashMap<String, IP> serverObj = new HashMap<String, IP>();
 		HostNodeConnector srcHost = null;
 		Node srcNode = null;
 		HostNodeConnector toRemove = null;
+		IStatisticsManager statManager = (IStatisticsManager) ServiceHelper
+                 .getGlobalInstance(IStatisticsManager.class, this);
 		for(HostNodeConnector hc : allHosts) {
 			if(hc.getNetworkAddressAsString().equals("10.0.0.1")) {
 				srcHost = hc;
 				srcNode = hc.getnodeConnector().getNode();
+				antLogger.info("checking stats : " + statManager.getNodeConnectorStatistics(hc.getnodeConnector()).getTransmitByteCount());
 				toRemove = hc;				
 			}
 		}
 		allHosts.remove(toRemove);
-		antLogger.info("testingg");
-		antLogger.info("No of servers: " + allHosts.size());
 		for(HostNodeConnector hc : allHosts) {
 			Node dstNode = hc.getnodeconnectorNode();
-			antLogger.info(hc.getNetworkAddressAsString());
 			IP obj = new IP(hc.getNetworkAddressAsString());
 			Set<Node> allNodes = new HashSet<Node>();
-			antLogger.info("Get allpaths called");
 			Set<List<Edge>> paths = getAllPaths(srcNode, dstNode, topo.getEdges().keySet(), allNodes);
-			antLogger.info("No of paths returned: " + paths.size());
 			int pathID = 1;
 			float initialPheromoneValue = (float) 0.1;
 			for (List<Edge> path : paths) {
@@ -159,7 +190,6 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 			antLogger.info(obj.IPaddress);
 			Map<Integer, PathList> pheromoneMatrix = obj.pheromoneMatrix;
 			Iterator<Integer> i1 = pheromoneMatrix.keySet().iterator();
-			antLogger.info("Matrix size : " + pheromoneMatrix.size());
 			while(i1.hasNext()) {
 				int pathno = i1.next() ;
 				antLogger.info( pathno+ " " + pheromoneMatrix.get(pathno).path.toString());
@@ -180,8 +210,6 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 	}
 
 	private Set<List<Edge>> getAllPaths(Node srcNode, Node dstNode, Set<Edge> allLinks, Set<Node> allNodes) {
-		antLogger.info("Src - Dst "+ srcNode + ":" + dstNode);
-		antLogger.info("Edges size checking == : " + allLinks.size());
 		// The new paths from srcNode to dstNode.
 		Set<List<Edge>> allPaths = new HashSet<List<Edge>>();
 		// Clone the available links such that we can modify them.
@@ -211,7 +239,6 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 			}
 
 			if (nextNode.equals(dstNode) ) {
-				antLogger.info("reached destination");
 				currentPath.add(link);
 				allPaths.add(currentPath);
 			} else {
@@ -237,25 +264,56 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 	
 	@Override
 	public String getPoolMemberForClient(Client source, VIP dest){
-
-		antLogger.trace("Received traffic from client : {} for VIP : {} ",source, dest);
-
 		syncWithLoadBalancerData();
-
-		PoolMember pm= null;
-
-		if(this.clientMemberMap.containsKey(source)){
-			pm= this.clientMemberMap.get(source);
-			antLogger.trace("Client {} had sent traffic before,new traffic will be routed to the same pool member {}",source,pm);
-		}else{
-			/* Pool pool = null;
-                pool = this.cmgr.getPool(dest.getPoolName());
-                int memberNum = this.randomGenerator.nextInt(pool.getAllMembers().size()-1);
-                pm = pool.getAllMembers().get(memberNum);
-                this.clientMemberMap.put(source, pm );
-                antLogger.trace("Network traffic from client {} will be directed to pool member {}",pm); */
+		return null;
+	}
+	
+	public List<Edge> getFinalPath(Client source, VIP dest) {
+		antLogger.trace("Received traffic from client : {} for VIP : {} ",source, dest);
+		String dstIp = "10.0.0.4";
+		IP obj = serverObj.get(dstIp);
+		List<Edge> bestPath = getBestPath(obj);
+		
+		syncWithLoadBalancerData();
+		
+		return null;	
+	}
+	
+	public List<Edge> getBestPath(IP obj) {
+		
+		Iterator<Integer> iter = obj.pheromoneMatrix.keySet().iterator();
+		int maxPathID = 0;
+		float max = 0;
+		LinkUtilization linkUtilObj = new LinkUtilization();
+		Map<Edge,Double> dataRates = linkUtilObj.getEdgeDataRates();
+		while(iter.hasNext()) {
+			int pathID = iter.next();
+			PathList path = obj.pheromoneMatrix.get(pathID);
+			List<Edge> edges = path.path;
+			float sum = 0;
+			for(Edge edge : edges) {
+				sum = (float) (sum + dataRates.get(edge));
+			}
+			float comparVal = ((100 - (sum/edges.size())) * obj.pheromoneMatrix.get(maxPathID).pheromoneValue);
+			if( comparVal > max ) {
+				max = comparVal;
+				maxPathID = pathID;
+			}
 		}
-		return pm.getIp();
+		
+		doLocalUpdate(obj, maxPathID);
+		return obj.pheromoneMatrix.get(maxPathID).path;
+		
+	}
+	
+	public void doLocalUpdate(IP obj, int minPathID) {
+		float updateVal = ((1 - localEvap) * obj.pheromoneMatrix.get(minPathID).pheromoneValue) + localEvap * localInit;
+		obj.pheromoneMatrix.get(minPathID).pheromoneValue = updateVal;
+		i++;
+		if(i >= 20) {
+			(new Thread(new GlobalUpdate(serverObj))).start();
+			i = 0;
+		}
 	}
 
 	/*

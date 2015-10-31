@@ -64,6 +64,7 @@
               edu.uci.ics.jung.algorithms.shortestpath,
               edu.uci.ics.jung.graph.util,
               org.opendaylight.controller.sal.action,
+              org.opendaylight.controller.sal.reader,
               org.opendaylight.controller.sal.match,
               org.opendaylight.controller.sal.packet,
               org.opendaylight.controller.sal.routing,

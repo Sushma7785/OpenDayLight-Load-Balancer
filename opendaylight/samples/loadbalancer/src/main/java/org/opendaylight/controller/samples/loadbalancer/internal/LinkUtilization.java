@@ -23,11 +23,11 @@ public class LinkUtilization implements Runnable {
     /** The interval for the Executor, in TimeUnit.SECONDS */
     protected final int DATARATE_CALCULATOR_INTERVAL = 5;
     /** The map that maintains up to date link data rate */
-    protected ConcurrentHashMap<Edge, Double> linkDataRate = null;
+    protected ConcurrentHashMap<Edge, Double> linkDataRate = new ConcurrentHashMap<Edge, Double>();
     /** The map that maintains up to date link Bytes transferred data */
-    protected ConcurrentHashMap<Edge, Long> linkBytesTransferred = null;
+    protected ConcurrentHashMap<Edge, Long> linkBytesTransferred = new ConcurrentHashMap<Edge, Long>();
 
-    public void init() {
+   public void init() {
         linkDataRate = new ConcurrentHashMap<Edge, Double>();
         linkBytesTransferred = new ConcurrentHashMap<Edge, Long>();
         Linklog.info("initialized");
@@ -35,7 +35,7 @@ public class LinkUtilization implements Runnable {
     
     @Override
     public void run() {
-    	Linklog.info("running");
+    	Linklog.info("running now");
         long thisDataRateTimestamp = System.currentTimeMillis();
 
         try {
@@ -62,18 +62,21 @@ public class LinkUtilization implements Runnable {
             double elapsedTime = 0.001 * (double) (thisDataRateTimestamp - lastDataRateTimestamp);
             Linklog.info("time in sec : " + elapsedTime);
             Set<Edge> currentEdges = edgeTopology.keySet();
-
+            Linklog.info("No of edges " + currentEdges.size());
             for (Edge edge : currentEdges) {
                 //log.info("Data rate calculator for edge {}", edge.toString());
                 // For this edge, find the nodeconnector of the tail (the source
                 // of the traffic)
                 NodeConnector tailNodeConnector = edge.getTailNodeConnector();
                 // Get the statistics for this NodeConnector
-                NodeConnectorStatistics ncStats = statisticsManager
-                        .getNodeConnectorStatistics(tailNodeConnector);
-                if(ncStats == null) continue;
+                NodeConnectorStatistics ncStats = statisticsManager.getNodeConnectorStatistics(tailNodeConnector);
+                if(ncStats == null) {
+                	Linklog.info("stats null");
+                	continue;
+                }
                 // long receiveBytes = ncStats.getReceiveByteCount();
                 long transmitBytes = ncStats.getTransmitByteCount();
+                Linklog.info("transmit bytes : " + transmitBytes );
                 long totalBytes = transmitBytes;
 
                 double dataRate = 0;
@@ -82,13 +85,17 @@ public class LinkUtilization implements Runnable {
                     // Already have a measurement for this edge
                     dataRate = (totalBytes - linkBytesTransferred.get(edge))
                             / elapsedTime;
+                    Linklog.info("Data rate : " + dataRate );
                 }
                 linkBytesTransferred.put(edge, totalBytes);
                 linkDataRate.put(edge, dataRate);
             }
+            Linklog.info("completed");
             
         } catch (Exception e) {
-            Linklog.warn("CalculateDataRates exception {}", e);
+        	e.printStackTrace();
+        	//throw new RuntimeException(e);
+            Linklog.info("CalculateDataRates exception {}", e);
         }
 
         lastDataRateTimestamp = thisDataRateTimestamp;
