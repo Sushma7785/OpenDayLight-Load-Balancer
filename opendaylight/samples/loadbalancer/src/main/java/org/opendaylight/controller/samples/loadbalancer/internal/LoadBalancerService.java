@@ -304,8 +304,10 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
                                 .equalsIgnoreCase(LBConst.ANT_LB_METHOD)) {
                         	
 	                        lbsLogger.info("calling initialization for " + this + " and antLBMethod " + LoadBalancerService.antLBMethod);
-	                  		antLBMethod.initialize(topo,hostTracker,switchManager);
-	                  		//List<Edge> path = antLBMethod.getFinalPath(client, vipWithPoolName);
+	                  		boolean done = antLBMethod.initialize(topo,hostTracker,switchManager);
+	                  		lbsLogger.info("returned " + done);
+	                  		List<Edge> path = antLBMethod.getFinalPath();
+	                  		lbsLogger.info(path.toString());
                         }
                         
                         if (configManager.getPool(vipWithPoolName.getPoolName()).getLbMethod()

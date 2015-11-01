@@ -23,9 +23,9 @@ public class LinkUtilization implements Runnable {
     /** The interval for the Executor, in TimeUnit.SECONDS */
     protected final int DATARATE_CALCULATOR_INTERVAL = 5;
     /** The map that maintains up to date link data rate */
-    protected ConcurrentHashMap<Edge, Double> linkDataRate = new ConcurrentHashMap<Edge, Double>();
+    protected static ConcurrentHashMap<Edge, Double> linkDataRate = new ConcurrentHashMap<Edge, Double>();
     /** The map that maintains up to date link Bytes transferred data */
-    protected ConcurrentHashMap<Edge, Long> linkBytesTransferred = new ConcurrentHashMap<Edge, Long>();
+    protected static ConcurrentHashMap<Edge, Long> linkBytesTransferred = new ConcurrentHashMap<Edge, Long>();
 
    public void init() {
         linkDataRate = new ConcurrentHashMap<Edge, Double>();
@@ -102,7 +102,7 @@ public class LinkUtilization implements Runnable {
         
     }
 
-    public Map<Edge,Double> getEdgeDataRates() {
+    public static Map<Edge,Double> getEdgeDataRates() {
         return linkDataRate;
     }
 }

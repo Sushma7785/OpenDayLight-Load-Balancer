@@ -93,7 +93,7 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 	/*
 	 * Local evaporation rate
 	 */
-	final float localEvap = (float) 0.5;
+	final float localEvap = (float) 0.1;
 	/*
 	 * Initial Local update value
 	 */
@@ -107,13 +107,17 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 	 */
 	final float beta = (float) 0.5;
 	/*
-	 * Value of Q
-	 */
-	final int Q = 1;
-	/*
 	 * Number of iterations for Global Update
 	 */
 	static int i = 0; 
+	/*
+	 * Bandwidth in bytes/sec
+	 */
+	final static long bandwidth = 100000000000L;
+	/*
+	 * Initial pheromone value
+	 */
+	static float initialPheromoneValue ;
 
 	@SuppressWarnings("unused")
 	private AntLBPolicy(){}
@@ -123,13 +127,15 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 	}
 
 
-	public void initialize(ITopologyManager topo, IfIptoHost hostTracker, ISwitchManager switchManager) {
+	public boolean initialize(ITopologyManager topo, IfIptoHost hostTracker, ISwitchManager switchManager) {
 		if(!initialized) {
 			synchronized(AntLBPolicy.class){
 				if(!initialized) {
 					this.topo = topo;
 					this.hostTracker = hostTracker;
 					this.switchManager = switchManager;
+					initialPheromoneValue = 1;
+					antLogger.info("initial value" + initialPheromoneValue);
 					dataRateCalculator = Executors.newSingleThreadScheduledExecutor();
 					linkUtilCalculate = new LinkUtilization();
 					linkUtilCalculate.init();
@@ -140,6 +146,8 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 		     	}
 			}
 		}
+		
+		return true;
 	}
 
 	public boolean createTopoGraph() {
@@ -176,9 +184,8 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 			Set<Node> allNodes = new HashSet<Node>();
 			Set<List<Edge>> paths = getAllPaths(srcNode, dstNode, topo.getEdges().keySet(), allNodes);
 			int pathID = 1;
-			float initialPheromoneValue = (float) 0.1;
 			for (List<Edge> path : paths) {
-				obj.pheromoneMatrix.put(pathID++, new PathList(path,initialPheromoneValue)); 
+				obj.pheromoneMatrix.put(pathID++, new PathObject(path,initialPheromoneValue)); 
 			}
 			serverObj.put(obj.IPaddress, obj);
 		}
@@ -188,25 +195,13 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 		while(i.hasNext()) {
 			IP obj = serverObj.get(i.next());
 			antLogger.info(obj.IPaddress);
-			Map<Integer, PathList> pheromoneMatrix = obj.pheromoneMatrix;
+			Map<Integer, PathObject> pheromoneMatrix = obj.pheromoneMatrix;
 			Iterator<Integer> i1 = pheromoneMatrix.keySet().iterator();
 			while(i1.hasNext()) {
 				int pathno = i1.next() ;
 				antLogger.info( pathno+ " " + pheromoneMatrix.get(pathno).path.toString());
 			}
 		} 
-		/*String ipOfServerSelected = "10.0.0.3";
-		IP main = serverObj.get(ipOfServerSelected);
-		float min = 999;
-		for(Integer i : main.pheromoneMatrix.keySet()) {
-			PathList obj = main.pheromoneMatrix.get(i);
-			List<Edge> path = obj.path;
-			float pathUtil = (float) 10.0;
-			//pathUtil= getUtilization(path);	
-			if(pathUtil < min) {
-				min = pathUtil;
-			}
-		}*/
 	}
 
 	private Set<List<Edge>> getAllPaths(Node srcNode, Node dstNode, Set<Edge> allLinks, Set<Node> allNodes) {
@@ -268,15 +263,16 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 		return null;
 	}
 	
-	public List<Edge> getFinalPath(Client source, VIP dest) {
-		antLogger.trace("Received traffic from client : {} for VIP : {} ",source, dest);
-		String dstIp = "10.0.0.4";
+	public List<Edge> getFinalPath() {
+		antLogger.info("Received traffic from client : called getFinalPath ");
+		String dstIp = "10.0.0.8";
 		IP obj = serverObj.get(dstIp);
+		antLogger.info(obj.toString());
 		List<Edge> bestPath = getBestPath(obj);
 		
-		syncWithLoadBalancerData();
+		//syncWithLoadBalancerData();
 		
-		return null;	
+		return bestPath;	
 	}
 	
 	public List<Edge> getBestPath(IP obj) {
@@ -284,36 +280,62 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 		Iterator<Integer> iter = obj.pheromoneMatrix.keySet().iterator();
 		int maxPathID = 0;
 		float max = 0;
-		LinkUtilization linkUtilObj = new LinkUtilization();
-		Map<Edge,Double> dataRates = linkUtilObj.getEdgeDataRates();
+		Map<Edge,Double> dataRates = LinkUtilization.getEdgeDataRates();
+		Iterator<Edge> i = dataRates.keySet().iterator();
+		while(i.hasNext()) {
+			Edge e = i.next();
+			antLogger.info("edge :" + e + " data rate: " + dataRates.get(e) );
+		}
 		while(iter.hasNext()) {
 			int pathID = iter.next();
-			PathList path = obj.pheromoneMatrix.get(pathID);
+			antLogger.info("path ID : " + pathID);
+			PathObject path = obj.pheromoneMatrix.get(pathID);
+			long pathAvailableBandwidth = Long.MAX_VALUE;
 			List<Edge> edges = path.path;
-			float sum = 0;
+			antLogger.info("path : " + edges);
 			for(Edge edge : edges) {
-				sum = (float) (sum + dataRates.get(edge));
+				 long linkBitRate = 0;
+				 antLogger.info("edge : " + edge);
+				 if(dataRates.containsKey(edge)) {
+					 antLogger.info("yess edge is there");
+				 }
+				 linkBitRate = dataRates.get(edge).longValue() * 8;
+				 antLogger.info("link bit rate : " + linkBitRate);
+				 long availableBandwidth = bandwidth - linkBitRate;
+                 if (availableBandwidth < 0)
+                     availableBandwidth = 0;
+
+                 if (availableBandwidth < pathAvailableBandwidth) {
+                	 antLogger.info("path avail bandwidth : " + pathAvailableBandwidth);
+                     pathAvailableBandwidth = availableBandwidth;
+                 }
+
 			}
-			float comparVal = ((100 - (sum/edges.size())) * obj.pheromoneMatrix.get(maxPathID).pheromoneValue);
+			float comparVal = (pathAvailableBandwidth * obj.pheromoneMatrix.get(pathID).pheromoneValue);
+			antLogger.info("comparVal : " + comparVal);
 			if( comparVal > max ) {
 				max = comparVal;
+				antLogger.info("max val : " + max);
 				maxPathID = pathID;
 			}
 		}
 		
-		doLocalUpdate(obj, maxPathID);
+		boolean done = doLocalUpdate(obj, maxPathID);
+		antLogger.info("local update completed : " + done);
 		return obj.pheromoneMatrix.get(maxPathID).path;
 		
 	}
 	
-	public void doLocalUpdate(IP obj, int minPathID) {
-		float updateVal = ((1 - localEvap) * obj.pheromoneMatrix.get(minPathID).pheromoneValue) + localEvap * localInit;
-		obj.pheromoneMatrix.get(minPathID).pheromoneValue = updateVal;
+	public boolean doLocalUpdate(IP obj, int maxPathID) {
+		float updateVal = ((1 - localEvap) * obj.pheromoneMatrix.get(maxPathID).pheromoneValue) + localEvap * localInit;
+		antLogger.info("local updated values : " + updateVal);
+		obj.pheromoneMatrix.get(maxPathID).pheromoneValue = updateVal;
 		i++;
 		if(i >= 20) {
 			(new Thread(new GlobalUpdate(serverObj))).start();
 			i = 0;
 		}
+		return true;
 	}
 
 	/*

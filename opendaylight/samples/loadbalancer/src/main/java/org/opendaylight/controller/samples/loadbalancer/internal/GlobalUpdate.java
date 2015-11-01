@@ -14,7 +14,7 @@ public class GlobalUpdate implements Runnable{
 	/*
 	 * Global evap rate
 	 */
-	final float globalEvap = (float) 0.5;
+	final float globalEvap = (float) 0.1;
 	/*
 	 * Value of Q
 	 */
