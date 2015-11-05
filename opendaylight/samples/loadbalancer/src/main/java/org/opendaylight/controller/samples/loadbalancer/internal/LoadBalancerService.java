@@ -306,8 +306,15 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
 	                        lbsLogger.info("calling initialization for " + this + " and antLBMethod " + LoadBalancerService.antLBMethod);
 	                  		boolean done = antLBMethod.initialize(topo,hostTracker,switchManager);
 	                  		lbsLogger.info("returned " + done);
-	                  		List<Edge> path = antLBMethod.getFinalPath();
-	                  		lbsLogger.info(path.toString());
+	                  		AntResult antResult = antLBMethod.getFinalPath(client);
+	                  		lbsLogger.info(antResult.serverIP +" " + antResult.path + " " + antResult.src);
+	                  		
+	                  		try {
+								installFlowforPath(antResult, vip);
+							} catch (UnknownHostException e) {
+								// TODO Auto-generated catch block
+								e.printStackTrace();
+							}
                         }
                         
                         if (configManager.getPool(vipWithPoolName.getPoolName()).getLbMethod()
@@ -319,6 +326,7 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
 			                    Node clientNode = inPkt.getIncomingNodeConnector().getNode();
 			                    // HostTracker hosts db key scheme implementation
 			                    IHostId id = HostIdFactory.create(InetAddress.getByName(poolMemberIp), null);
+			                    lbsLogger.info(InetAddress.getByName(poolMemberIp).toString());
 			                    HostNodeConnector hnConnector = this.hostTracker.hostFind(id);
 			
 			                    Node destNode = hnConnector.getnodeconnectorNode();
@@ -352,7 +360,7 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
 			                    if (installLoadBalancerFlow(client, vip, clientNode, poolMemberIp,
 			                            hnConnector.getDataLayerAddressBytes(), forwardPort,
 			                            LBConst.FORWARD_DIRECTION_LB_FLOW)) {
-			                        lbsLogger.trace("Traffic from client : {} will be routed " + "to pool machine : {}",
+			                        lbsLogger.info("Traffic from client : {} will be routed " + "to pool machine : {}",
 			                                client, poolMemberIp);
 			                    } else {
 			                        lbsLogger.error("Not able to route traffic from client : {}", client);
@@ -385,6 +393,155 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
     
     
    
+	private boolean installFlowforPath(AntResult antResult, VIP vip) throws UnknownHostException {
+		 IHostId id = HostIdFactory.create(InetAddress.getByName(antResult.serverIP), null);
+         lbsLogger.info(InetAddress.getByName(antResult.serverIP).toString());
+         HostNodeConnector hnConnector = this.hostTracker.hostFind(id);
+         IHostId idSrc = HostIdFactory.create(InetAddress.getByName(antResult.src.getIp()), null);
+         lbsLogger.info(InetAddress.getByName(antResult.src.getIp()).toString());
+         HostNodeConnector hnConnectorSrc = this.hostTracker.hostFind(idSrc);
+		for(Edge edge : antResult.path) {
+			
+			if(edge.getHeadNodeConnector().getNode().equals(hnConnector.getnodeconnectorNode())) {
+				
+				if(installLoadBalancerFlowforAnt(antResult.src, vip, edge.getHeadNodeConnector().getNode(), antResult.serverIP,hnConnector.getDataLayerAddressBytes(), hnConnector.getnodeConnector(), LBConst.FORWARD_DIRECTION_LB_FLOW, true)) {
+					lbsLogger.info("success");
+				}
+				else {
+					lbsLogger.info("failure foward flow install");
+				}
+			}
+		
+			if(installLoadBalancerFlowforAnt(antResult.src, vip, edge.getTailNodeConnector().getNode(), antResult.serverIP,hnConnector.getDataLayerAddressBytes(), edge.getTailNodeConnector(), LBConst.FORWARD_DIRECTION_LB_FLOW, false)) {
+				lbsLogger.info("success");
+			}
+			else {
+				lbsLogger.info("failure foward flow install");
+			}
+		}
+			
+		for(Edge edgeRev : antResult.path) {
+				
+				if(edgeRev.getTailNodeConnector().getNode().equals(hnConnectorSrc.getnodeconnectorNode())) {
+					
+					if(installLoadBalancerFlowforAnt(antResult.src, vip, edgeRev.getTailNodeConnector().getNode(), antResult.serverIP,hnConnector.getDataLayerAddressBytes(), hnConnectorSrc.getnodeConnector(), LBConst.REVERSE_DIRECTION_LB_FLOW, true)) {
+						lbsLogger.info("success");
+					}
+					else {
+						lbsLogger.info("failure foward flow install");
+					}
+				}
+			
+				if(installLoadBalancerFlowforAnt(antResult.src, vip, edgeRev.getHeadNodeConnector().getNode(), antResult.serverIP,hnConnector.getDataLayerAddressBytes(), edgeRev.getHeadNodeConnector(), LBConst.REVERSE_DIRECTION_LB_FLOW, false)) {
+					lbsLogger.info("success");
+				}
+				else {
+					lbsLogger.info("failure foward flow install");
+				}
+			
+	}
+		
+		
+		return true;
+	}
+	
+
+	/*
+     * This method installs the flow rule for routing the traffic between two
+     * hosts for the selected path using Ant Colony System Algorithm
+     *
+     * @param source Traffic is sent by this source
+     *
+     * @param dest Traffic is destined to this destination (VIP)
+     *
+     * @param sourceSwitch Switch from where controller received the packet
+     *
+     * @param destMachineIp IP address of the pool member where traffic needs to
+     * be routed
+     *
+     * @param destMachineMac MAC address of the pool member where traffic needs
+     * to be routed
+     *
+     * @param outport Use this port to send out traffic
+     *
+     * @param flowDirection FORWARD_DIRECTION_LB_FLOW or
+     * REVERSE_DIRECTION_LB_FLOW
+     *
+     * @return true If flow installation was successful false else
+     *
+     * @throws UnknownHostException
+     */
+    private boolean installLoadBalancerFlowforAnt(Client source, VIP dest, Node sourceSwitch, String destMachineIp,
+            byte[] destMachineMac, NodeConnector outport, int flowDirection, boolean set) throws UnknownHostException {
+
+        Match match = new Match();
+        List<Action> actions = new ArrayList<Action>();
+
+        if (flowDirection == LBConst.FORWARD_DIRECTION_LB_FLOW) {
+            match.setField(MatchType.DL_TYPE, EtherTypes.IPv4.shortValue());
+            match.setField(MatchType.NW_SRC, InetAddress.getByName(source.getIp()));
+            match.setField(MatchType.NW_DST, InetAddress.getByName(dest.getIp()));
+            match.setField(MatchType.NW_PROTO, IPProtocols.getProtocolNumberByte(dest.getProtocol()));
+            match.setField(MatchType.TP_SRC, source.getPort());
+            match.setField(MatchType.TP_DST, dest.getPort());
+            if(set == true) {
+            actions.add(new SetNwDst(InetAddress.getByName(destMachineIp)));
+            actions.add(new SetDlDst(destMachineMac));
+            }
+        }
+
+        if (flowDirection == LBConst.REVERSE_DIRECTION_LB_FLOW) {
+            match.setField(MatchType.DL_TYPE, EtherTypes.IPv4.shortValue());
+            match.setField(MatchType.NW_SRC, InetAddress.getByName(destMachineIp));
+            match.setField(MatchType.NW_DST, InetAddress.getByName(source.getIp()));
+            match.setField(MatchType.NW_PROTO, IPProtocols.getProtocolNumberByte(source.getProtocol()));
+            match.setField(MatchType.TP_SRC, dest.getPort());
+            match.setField(MatchType.TP_DST, source.getPort());
+            if(set == true) {
+                actions.add(new SetNwSrc(InetAddress.getByName(dest.getIp())));
+                actions.add(new SetDlSrc(destMachineMac));
+                }
+        }
+
+        actions.add(new Output(outport));
+
+        // Make sure the priority for IP switch entries is
+        // set to a level just above default drop entries
+
+        Flow flow = new Flow(match, actions);
+        flow.setIdleTimeout((short) 5);
+        flow.setHardTimeout((short) 0);
+        flow.setPriority(LB_IPSWITCH_PRIORITY);
+        lbsLogger.info("complete flow actions: " + flow.getActions() );
+        lbsLogger.info("complete flow mactes: " + flow.getMatch());
+        String policyName = source.getIp() + ":" + source.getProtocol() + ":" + source.getPort();
+        String flowName = null;
+
+        if (flowDirection == LBConst.FORWARD_DIRECTION_LB_FLOW) {
+            flowName = "[" + policyName + ":" + source.getIp() + ":" + dest.getIp() + "]";
+        }
+
+        if (flowDirection == LBConst.REVERSE_DIRECTION_LB_FLOW) {
+
+            flowName = "[" + policyName + ":" + dest.getIp() + ":" + source.getIp() + "]";
+        }
+
+        FlowEntry fEntry = new FlowEntry(policyName, flowName, flow, sourceSwitch);
+
+        lbsLogger.trace("Install flow entry {} on node {}", fEntry.toString(), sourceSwitch.toString());
+
+        if (!this.ruleManager.checkFlowEntryConflict(fEntry)) {
+            if (this.ruleManager.installFlowEntry(fEntry).isSuccess()) {
+                return true;
+            } else {
+                lbsLogger.error("Error in installing flow entry to node : {}", sourceSwitch);
+            }
+        } else {
+            lbsLogger.error("Conflicting flow entry exists : {}", fEntry.toString());
+        }
+        return false;
+    }
+
 	/*
      * This method installs the flow rule for routing the traffic between two
      * hosts.
@@ -449,7 +606,8 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
         flow.setIdleTimeout((short) 5);
         flow.setHardTimeout((short) 0);
         flow.setPriority(LB_IPSWITCH_PRIORITY);
-
+        lbsLogger.info("complete flow actions: " + flow.getActions() );
+        lbsLogger.info("complete flow mactes: " + flow.getMatch());
         String policyName = source.getIp() + ":" + source.getProtocol() + ":" + source.getPort();
         String flowName = null;
 

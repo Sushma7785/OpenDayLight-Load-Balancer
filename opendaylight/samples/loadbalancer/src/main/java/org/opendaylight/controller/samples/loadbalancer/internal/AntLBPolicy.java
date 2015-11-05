@@ -263,16 +263,17 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 		return null;
 	}
 	
-	public List<Edge> getFinalPath() {
+	public AntResult getFinalPath(Client source) {
+		
 		antLogger.info("Received traffic from client : called getFinalPath ");
-		String dstIp = "10.0.0.8";
-		IP obj = serverObj.get(dstIp);
+		String serverIP = "10.0.0.8";
+		IP obj = serverObj.get(serverIP);
 		antLogger.info(obj.toString());
 		List<Edge> bestPath = getBestPath(obj);
 		
 		//syncWithLoadBalancerData();
-		
-		return bestPath;	
+		AntResult resultObj = new AntResult(serverIP, source, bestPath);
+		return resultObj;	
 	}
 	
 	public List<Edge> getBestPath(IP obj) {
