@@ -11,6 +11,7 @@ import java.util.Set;
 
 import org.opendaylight.controller.samples.loadbalancer.entities.Pool;
 import org.opendaylight.controller.samples.loadbalancer.entities.PoolMember;
+import org.opendaylight.controller.samples.loadbalancer.entities.Server;
 import org.opendaylight.controller.samples.loadbalancer.entities.VIP;
 
 /**
@@ -25,6 +26,8 @@ public interface IConfigManager {
      * if there is no VIP, it will return empty set.
      */
     public Set<VIP> getAllVIPs();
+    
+    public Set<Server> getAllServers();
 
     /**
      * Check if VIP with the 'name' exists
@@ -64,6 +67,15 @@ public interface IConfigManager {
      * @return  Newly created VIP
      */
     public VIP createVIP(String name,String ip,String protocol,short protocolPort,String poolName);
+    
+    /**
+     * Add Server to the configuration
+     * @param ip    IP of the VIP
+     * @param usage Server usage
+     * @return  Newly created server
+     */
+    
+    public Server createServer(String ip, String usage);
 
     /**
      * Return pool attached to VIP

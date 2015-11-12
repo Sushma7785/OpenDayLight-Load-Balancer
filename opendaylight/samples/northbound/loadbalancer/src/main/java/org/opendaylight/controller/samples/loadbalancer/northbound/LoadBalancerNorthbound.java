@@ -26,6 +26,7 @@ import org.codehaus.enunciate.jaxrs.TypeHint;
 import org.opendaylight.controller.containermanager.IContainerManager;
 import org.opendaylight.controller.samples.loadbalancer.entities.Pool;
 import org.opendaylight.controller.samples.loadbalancer.entities.PoolMember;
+import org.opendaylight.controller.samples.loadbalancer.entities.Server;
 import org.opendaylight.controller.samples.loadbalancer.entities.VIP;
 import org.opendaylight.controller.northbound.commons.RestMessages;
 import org.opendaylight.controller.northbound.commons.exception.InternalServerErrorException;
@@ -240,6 +241,40 @@ public class LoadBalancerNorthbound {
         }
         throw new InternalServerErrorException(NBConst.RES_VIP_CREATION_FAILED);
     }
+    
+    @Path("/{containerName}/add/server")
+    @PUT	
+    @Consumes( { MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
+    @StatusCodes( {
+    	@ResponseCode(code =201, condition = "Server created sucessfully"),
+    	@ResponseCode(code = 415, condition = "Invalid input name")})
+    public Response addServer(@PathParam("containerName") String containerName,
+    	@TypeHint(Server.class) Server server) {
+    	Server serverInput = server;
+    	String ip = serverInput.getIP();
+    	String usage = serverInput.getUsage();
+    	if(ip.isEmpty() ||
+                usage.isEmpty()) {
+            throw new UnsupportedMediaTypeException(RestMessages.INVALIDDATA.toString());
+        }
+    	
+    	IConfigManager configManager = getConfigManagerService(containerName);
+
+        if (configManager == null) {
+            throw new ServiceUnavailableException("Load Balancer "
+                    + RestMessages.SERVICEUNAVAILABLE.toString());
+        }
+
+        
+           Server serverObj = configManager.createServer(ip, usage);
+            if ( server != null){
+                return Response.status(Response.Status.CREATED).build();
+            }
+        else{
+            throw new ResourceConflictException(NBConst.RES_SERVER_CREATION_FAILED);
+        }    	
+    }
+    
 
     @Path("/{containerName}/update/vip")
     @PUT

@@ -13,6 +13,7 @@ import java.util.Set;
 
 import org.opendaylight.controller.samples.loadbalancer.entities.Pool;
 import org.opendaylight.controller.samples.loadbalancer.entities.PoolMember;
+import org.opendaylight.controller.samples.loadbalancer.entities.Server;
 import org.opendaylight.controller.samples.loadbalancer.entities.VIP;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,6 +41,10 @@ public class ConfigManager implements IConfigManager{
      * All the available Pools
      */
     private HashMap<String,Pool> pools = new HashMap<String,Pool>();
+    /*
+     * All servers
+     */
+   public HashMap<String,Server> servers = new HashMap<String,Server>();
 
     public ConfigManager(){
     }
@@ -290,4 +295,20 @@ public class ConfigManager implements IConfigManager{
     public String toString() {
         return "ConfigManager [vips=" + vips + ", pools=" + pools + "]";
     }
+
+	@Override
+	public Server createServer(String ip, String usage) {
+		Server server = new Server(ip,usage);
+
+        cmLogger.info("New server created : " + server.toString());
+
+        servers.put(ip, server);
+
+        return server;
+	}
+
+	@Override
+	public Set<Server> getAllServers() {
+		return new HashSet<Server>(this.servers.values());
+	}
 }

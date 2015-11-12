@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -24,6 +25,7 @@ import org.opendaylight.controller.sal.utils.ServiceHelper;
 import org.opendaylight.controller.samples.loadbalancer.ConfigManager;
 import org.opendaylight.controller.samples.loadbalancer.entities.Client;
 import org.opendaylight.controller.samples.loadbalancer.entities.PoolMember;
+import org.opendaylight.controller.samples.loadbalancer.entities.Server;
 import org.opendaylight.controller.samples.loadbalancer.entities.VIP;
 import org.opendaylight.controller.samples.loadbalancer.policies.ILoadBalancingPolicy;
 import org.opendaylight.controller.statisticsmanager.IStatisticsManager;
@@ -110,6 +112,10 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 	 * Number of iterations for Global Update
 	 */
 	static int i = 0; 
+	
+	static int count = 0;
+	
+	static String [] arr = {"10.0.0.5","10.0.0.4","10.0.0.6","10.0.0.8"}; 
 	/*
 	 * Bandwidth in bytes/sec
 	 */
@@ -166,18 +172,18 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 		Set<HostNodeConnector> allHosts = hostTracker.getAllHosts();
 		HostNodeConnector srcHost = null;
 		Node srcNode = null;
-		HostNodeConnector toRemove = null;
+		List<HostNodeConnector> toRemove = new LinkedList<HostNodeConnector>();
 		IStatisticsManager statManager = (IStatisticsManager) ServiceHelper
                  .getGlobalInstance(IStatisticsManager.class, this);
 		for(HostNodeConnector hc : allHosts) {
-			if(hc.getNetworkAddressAsString().equals("10.0.0.1")) {
+			if(hc.getNetworkAddressAsString().equals("10.0.0.1") || hc.getNetworkAddressAsString().equals("10.0.0.2") || hc.getNetworkAddressAsString().equals("10.0.0.3")) {
 				srcHost = hc;
 				srcNode = hc.getnodeConnector().getNode();
 				antLogger.info("checking stats : " + statManager.getNodeConnectorStatistics(hc.getnodeConnector()).getTransmitByteCount());
-				toRemove = hc;				
+				toRemove.add(hc);				
 			}
 		}
-		allHosts.remove(toRemove);
+		allHosts.removeAll(toRemove);
 		for(HostNodeConnector hc : allHosts) {
 			Node dstNode = hc.getnodeconnectorNode();
 			IP obj = new IP(hc.getNetworkAddressAsString());
@@ -264,9 +270,12 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 	}
 	
 	public AntResult getFinalPath(Client source) {
+		String serverIP = arr[count%4];
+		count = count+1;
+		antLogger.info("Received traffic from client : called getFinalPath for server : " + serverIP);
+		Set<Server> servers = cmgr.getAllServers();
+		antLogger.info("All servers " + servers);
 		
-		antLogger.info("Received traffic from client : called getFinalPath ");
-		String serverIP = "10.0.0.8";
 		IP obj = serverObj.get(serverIP);
 		antLogger.info(obj.toString());
 		List<Edge> bestPath = getBestPath(obj);

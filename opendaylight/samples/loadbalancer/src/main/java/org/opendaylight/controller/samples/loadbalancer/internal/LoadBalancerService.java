@@ -52,6 +52,7 @@ import org.opendaylight.controller.samples.loadbalancer.LBUtil;
 import org.opendaylight.controller.samples.loadbalancer.entities.Client;
 import org.opendaylight.controller.samples.loadbalancer.entities.Pool;
 import org.opendaylight.controller.samples.loadbalancer.entities.PoolMember;
+import org.opendaylight.controller.samples.loadbalancer.entities.Server;
 import org.opendaylight.controller.samples.loadbalancer.entities.VIP;
 import org.opendaylight.controller.samples.loadbalancer.policies.RandomLBPolicy;
 import org.opendaylight.controller.samples.loadbalancer.policies.RoundRobinLBPolicy;
@@ -784,4 +785,16 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
     public String getVIPAttachedPool(String name) {
         return configManager.getVIPAttachedPool(name);
     }
+
+	@Override
+	public Set<Server> getAllServers() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public Server createServer(String ip, String usage) {
+		// TODO Auto-generated method stub
+		return null;
+	}
 }

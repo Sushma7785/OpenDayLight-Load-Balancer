@@ -40,4 +40,6 @@ public class NBConst {
     public static final String RES_POOLMEMBER_DELETION_FAILED = " Deletion of pool member failed";
 
     public static final String RES_VIP_POOL_EXIST = "Pool already attached to a VIP";
+    
+    public static final String RES_SERVER_CREATION_FAILED = "Creation of server object failed";
 }
