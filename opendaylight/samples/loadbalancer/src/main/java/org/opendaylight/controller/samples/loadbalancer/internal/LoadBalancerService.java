@@ -10,9 +10,12 @@ package org.opendaylight.controller.samples.loadbalancer.internal;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Dictionary;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.StringTokenizer;
 
 import org.apache.felix.dm.Component;
 import org.opendaylight.controller.forwardingrulesmanager.FlowEntry;
@@ -39,8 +42,11 @@ import org.opendaylight.controller.sal.packet.IDataPacketService;
 import org.opendaylight.controller.sal.packet.IListenDataPacket;
 import org.opendaylight.controller.sal.packet.IPv4;
 import org.opendaylight.controller.sal.packet.Packet;
+import org.opendaylight.controller.sal.packet.PacketException;
 import org.opendaylight.controller.sal.packet.PacketResult;
 import org.opendaylight.controller.sal.packet.RawPacket;
+import org.opendaylight.controller.sal.packet.TCP;
+import org.opendaylight.controller.sal.packet.UDP;
 import org.opendaylight.controller.sal.routing.IRouting;
 import org.opendaylight.controller.sal.utils.EtherTypes;
 import org.opendaylight.controller.sal.utils.GlobalConstants;
@@ -261,22 +267,61 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
      * load balancing policy of the VIP's attached pool and will install
      * appropriate flow rules in a reactive manner.
      */
+    
+    static private InetAddress intToInetAddress(int i) {
+        byte b[] = new byte[] { (byte) ((i>>24)&0xff), (byte) ((i>>16)&0xff), (byte) ((i>>8)&0xff), (byte) (i&0xff) };
+        InetAddress addr;
+        try {
+            addr = InetAddress.getByAddress(b);
+        } catch (UnknownHostException e) {
+            return null;
+        }
+ 
+        return addr;
+    }
+    
+    static private int hextoInt(String s) {
+            s = s.toUpperCase();
+            int val = 0;
+            for (int i = 0; i < s.length(); i++) {
+                char c = s.charAt(i);
+                int j = (int) c;
+                int d = s.indexOf(c);
+                val = val + j*(16^(s.length()-1-d));
+            }
+            return val;
+        }
+    	
     @Override
     public PacketResult receiveDataPacket(RawPacket inPkt) {
     	
         if (inPkt == null) {
+        	lbsLogger.info("entered wrong");
             return PacketResult.IGNORED;
         }
-
+       
         Packet formattedPak = this.dataPacketService.decodeDataPacket(inPkt);
 
         if (formattedPak instanceof Ethernet) {
+        	
+        	
             byte[] vipMacAddr = ((Ethernet) formattedPak).getDestinationMACAddress();
             Object ipPkt = formattedPak.getPayload();
-
             if (ipPkt instanceof IPv4) {
 
                 IPv4 ipv4Pkt = (IPv4) ipPkt;
+           
+                if(Integer.toString(ipv4Pkt.getDestinationAddress()).equals("167772200")) {
+                	int src = ipv4Pkt.getSourceAddress();
+                	InetAddress addrSrc = intToInetAddress(src);
+                	lbsLogger.info(addrSrc.toString().substring(1));
+                	String payload = ipv4Pkt.getPayload().toString();
+                	String[] arr = payload.split(",");
+                	String[] arr1 = arr[1].split(" ");
+                	String cpuUsage = arr1[2];
+                	lbsLogger.info("usage " + (100 - Integer.parseInt(cpuUsage, 16)));
+                	AntLBPolicy.serverUsage.put(addrSrc.toString().substring(1), 100 - Integer.parseInt(cpuUsage, 16));
+                }
                 if (IPProtocols.getProtocolName(ipv4Pkt.getProtocol()).equals(IPProtocols.TCP.toString())
                         || IPProtocols.getProtocolName(ipv4Pkt.getProtocol()).equals(IPProtocols.UDP.toString())) {
 
@@ -308,7 +353,7 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
 	                  		boolean done = antLBMethod.initialize(topo,hostTracker,switchManager);
 	                  		lbsLogger.info("returned " + done);
 	                  		AntResult antResult = antLBMethod.getFinalPath(client);
-	                  		lbsLogger.info(antResult.serverIP +" " + antResult.path + " " + antResult.src);
+	                  		lbsLogger.info("final result " + antResult.serverIP +" " + antResult.path + " " + antResult.src);
 	                  		
 	                  		try {
 								installFlowforPath(antResult, vip);

@@ -4,13 +4,16 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Logger;
 
 import org.opendaylight.controller.sal.core.Edge;
+import org.slf4j.LoggerFactory;
 
 
 
 public class GlobalUpdate implements Runnable{
 	ConcurrentHashMap<String, IP> serverObj = new ConcurrentHashMap<String, IP>();
+	 private static Logger globalUpdateLogger = (Logger) LoggerFactory.getLogger(GlobalUpdate.class);
 	/*
 	 * Global evap rate
 	 */
@@ -51,6 +54,7 @@ public class GlobalUpdate implements Runnable{
 	private void performUpdate(IP obj, int minPathID, int minHop) {
 		float updateVal = ((1 - globalEvap) * obj.pheromoneMatrix.get(minPathID).pheromoneValue) + (globalEvap * (Q/minHop));
 		obj.pheromoneMatrix.get(minPathID).pheromoneValue = updateVal;
+		globalUpdateLogger.info("Global update completed");
 	}
 
 }
