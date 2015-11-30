@@ -30,17 +30,17 @@ public class LinkUtilization implements Runnable {
    public void init() {
         linkDataRate = new ConcurrentHashMap<Edge, Double>();
         linkBytesTransferred = new ConcurrentHashMap<Edge, Long>();
-        Linklog.info("initialized");
+        Linklog.debug("initialized");
     }
     
     @Override
     public void run() {
-    	Linklog.info("running now");
+    	Linklog.debug("running now");
         long thisDataRateTimestamp = System.currentTimeMillis();
 
         try {
 
-            //log.info("CalculateDataRates running");
+            //log.debug("CalculateDataRates running");
 
             ITopologyManager topologyManager = (ITopologyManager) ServiceHelper
                     .getGlobalInstance(ITopologyManager.class, this);
@@ -49,34 +49,34 @@ public class LinkUtilization implements Runnable {
                     .getGlobalInstance(IStatisticsManager.class, this);
 
             if(topologyManager == null || statisticsManager == null) {
-                Linklog.info("CalculateDataRates: topology or statistics Manager is null!");
+                Linklog.debug("CalculateDataRates: topology or statistics Manager is null!");
                 return;
             }
             if(linkDataRate == null || linkBytesTransferred == null) {
-                Linklog.info("CalculateDataRates: linkDataRate or linkBytesTransferred maps are null");
+                Linklog.debug("CalculateDataRates: linkDataRate or linkBytesTransferred maps are null");
                 return;
             }
             Map<Edge, Set<Property>> edgeTopology = topologyManager.getEdges();
 
             // Elapsed time in seconds
             double elapsedTime = 0.001 * (double) (thisDataRateTimestamp - lastDataRateTimestamp);
-            Linklog.info("time in sec : " + elapsedTime);
+            Linklog.debug("time in sec : " + elapsedTime);
             Set<Edge> currentEdges = edgeTopology.keySet();
-            Linklog.info("No of edges " + currentEdges.size());
+            Linklog.debug("No of edges " + currentEdges.size());
             for (Edge edge : currentEdges) {
-                //log.info("Data rate calculator for edge {}", edge.toString());
+                //log.debug("Data rate calculator for edge {}", edge.toString());
                 // For this edge, find the nodeconnector of the tail (the source
                 // of the traffic)
                 NodeConnector tailNodeConnector = edge.getTailNodeConnector();
                 // Get the statistics for this NodeConnector
                 NodeConnectorStatistics ncStats = statisticsManager.getNodeConnectorStatistics(tailNodeConnector);
                 if(ncStats == null) {
-                	Linklog.info("stats null");
+                	Linklog.debug("stats null");
                 	continue;
                 }
                 // long receiveBytes = ncStats.getReceiveByteCount();
                 long transmitBytes = ncStats.getTransmitByteCount();
-                Linklog.info("transmit bytes : " + transmitBytes );
+                Linklog.debug("transmit bytes : " + transmitBytes );
                 long totalBytes = transmitBytes;
 
                 double dataRate = 0;
@@ -85,17 +85,17 @@ public class LinkUtilization implements Runnable {
                     // Already have a measurement for this edge
                     dataRate = (totalBytes - linkBytesTransferred.get(edge))
                             / elapsedTime;
-                    Linklog.info("Data rate : " + dataRate );
+                    Linklog.debug("Data rate : " + dataRate );
                 }
                 linkBytesTransferred.put(edge, totalBytes);
                 linkDataRate.put(edge, dataRate);
             }
-            Linklog.info("completed");
+            Linklog.debug("completed");
             
         } catch (Exception e) {
         	e.printStackTrace();
         	//throw new RuntimeException(e);
-            Linklog.info("CalculateDataRates exception {}", e);
+            Linklog.debug("CalculateDataRates exception {}", e);
         }
 
         lastDataRateTimestamp = thisDataRateTimestamp;

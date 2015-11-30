@@ -152,21 +152,21 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 					this.switchManager = switchManager;
 					AntLBPolicy = true;
 					initialPheromoneValue = 1;
-					antLogger.info("initial value" + initialPheromoneValue);
+					antLogger.debug("initial value" + initialPheromoneValue);
 					dataRateCalculator = Executors.newSingleThreadScheduledExecutor();
 					linkUtilCalculate = new LinkUtilization();
 					linkUtilCalculate.init();
 					dataRateCalculator.scheduleAtFixedRate(linkUtilCalculate, 0, linkUtilCalculate.DATARATE_CALCULATOR_INTERVAL,TimeUnit.SECONDS);
 					initialized = true;
-					antLogger.info("N/w topology created: " + createTopoGraph());
+					antLogger.debug("N/w topology created: " + createTopoGraph());
 					initMatrix(this.topo, this.hostTracker);
 					if(policy.equals("ANT_LB_METHOD")) {
 						AntLBPolicy = true;	
-						antLogger.info("policy set to : " + policy);
+						antLogger.debug("policy set to : " + policy);
 					}
 					else if(policy.equals("ANT_RR_METHOD")) {
 						AntLBPolicy = false;
-						antLogger.info("policy set to : " + policy);
+						antLogger.debug("policy set to : " + policy);
 					}
 		     	}
 			}
@@ -196,7 +196,7 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
                  .getGlobalInstance(IStatisticsManager.class, this);
 		for(HostNodeConnector hc : allHosts) {
 			if(hc.getNetworkAddressAsString().equals("10.0.0.1") || hc.getNetworkAddressAsString().equals("10.0.0.2") || hc.getNetworkAddressAsString().equals("10.0.0.3") || hc.getNetworkAddressAsString().equals("10.0.0.6") || hc.getNetworkAddressAsString().equals("10.0.0.7"))  {
-				antLogger.info(hc.getNetworkAddressAsString());
+				antLogger.debug(hc.getNetworkAddressAsString());
 				srcHost = hc;
 				srcNode = hc.getnodeConnector().getNode();
 				toRemove.add(hc);				
@@ -216,15 +216,15 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 		}
 		
 		Iterator<String> i = serverObj.keySet().iterator();
-		antLogger.info("Number of server: " + serverObj.size());
+		antLogger.debug("Number of server: " + serverObj.size());
 		while(i.hasNext()) {
 			IP obj = serverObj.get(i.next());
-			antLogger.info(obj.IPaddress);
+			antLogger.debug(obj.IPaddress);
 			Map<Integer, PathObject> pheromoneMatrix = obj.pheromoneMatrix;
 			Iterator<Integer> i1 = pheromoneMatrix.keySet().iterator();
 			while(i1.hasNext()) {
 				int pathno = i1.next() ;
-				antLogger.info( pathno+ " " + pheromoneMatrix.get(pathno).path.toString());
+				antLogger.debug( pathno+ " " + pheromoneMatrix.get(pathno).path.toString());
 			}
 		} 
 		
@@ -294,7 +294,7 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 		int min = 100;
 		String minServer = null;
 		Iterator<String> iter = serverUsage.keySet().iterator();
-		antLogger.info("size " + serverUsage.size());
+		antLogger.debug("size " + serverUsage.size());
 		while(iter.hasNext()) {
 			String serverKey = iter.next();
 			int usage = serverUsage.get(serverKey);
@@ -325,7 +325,7 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 		else {
 			serverIP = getServer();
 		}
-		antLogger.info("Received traffic from client : called getFinalPath for server : " + serverIP);
+		antLogger.debug("Received traffic from client : called getFinalPath for server : " + serverIP);
 		IP obj = serverObj.get(serverIP);
 		List<Edge> bestPath = getBestPath(obj);
 		
@@ -343,15 +343,15 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 		Map<Edge,Double> dataRates = LinkUtilization.getEdgeDataRates();
 		while(iter.hasNext()) {
 			int pathID = iter.next();
-			antLogger.info("path ID : " + pathID);
+			antLogger.debug("path ID : " + pathID);
 			PathObject path = obj.pheromoneMatrix.get(pathID);
 			long pathAvailableBandwidth = Long.MAX_VALUE;
 			List<Edge> edges = path.path;
-			antLogger.info("path : " + edges);
+			antLogger.debug("path : " + edges);
 			for(Edge edge : edges) {
 				 long linkBitRate = 0;
 				 linkBitRate = dataRates.get(edge).longValue() * 8;
-				 antLogger.info("link bit rate of edge: " + edge + " " + linkBitRate);
+				 antLogger.debug("link bit rate of edge: " + edge + " " + linkBitRate);
 				 long availableBandwidth = bandwidth - linkBitRate;
                  if (availableBandwidth < 0) {
                      availableBandwidth = 0;
@@ -359,28 +359,28 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 
                  if (availableBandwidth < pathAvailableBandwidth) {
                      pathAvailableBandwidth = availableBandwidth;
-                     antLogger.info("path avail bandwidth : " + pathAvailableBandwidth);
+                     antLogger.debug("path avail bandwidth : " + pathAvailableBandwidth);
                  }
 
 			}
 			comparVal = pathAvailableBandwidth * obj.pheromoneMatrix.get(pathID).pheromoneValue;
-			antLogger.info("comparVal : " + comparVal);
+			antLogger.debug("comparVal : " + comparVal);
 			if( comparVal > max ) {
 				max = comparVal;
-				antLogger.info("max val : " + max);
+				antLogger.debug("max val : " + max);
 				maxPathID = pathID;
 			}
 		}
 		
 		boolean done = doLocalUpdate(obj, maxPathID);
-		antLogger.info("local update completed : " + done);
+		antLogger.debug("local update completed : " + done);
 		return obj.pheromoneMatrix.get(maxPathID).path;
 		
 	}
 	
 	public boolean doLocalUpdate(IP obj, int maxPathID) {
 		float updateVal = ((1 - localEvap) * obj.pheromoneMatrix.get(maxPathID).pheromoneValue) + localEvap * localInit;
-		antLogger.info("local updated values : " + updateVal);
+		antLogger.debug("local updated values : " + updateVal);
 		obj.pheromoneMatrix.get(maxPathID).pheromoneValue = updateVal;
 		i++;
 		if(i >= 20) {

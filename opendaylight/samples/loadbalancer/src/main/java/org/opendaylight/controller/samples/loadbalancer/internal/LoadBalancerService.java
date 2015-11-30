@@ -232,7 +232,7 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
     }
     
     public void setTopo(ITopologyManager topo) {
-        lbsLogger.info("Setting TopoManger to: " + topo);
+        lbsLogger.debug("Setting TopoManger to: " + topo);
         this.topo = topo;
     }
 
@@ -302,7 +302,7 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
     public PacketResult receiveDataPacket(RawPacket inPkt) {
     	
         if (inPkt == null) {
-        	lbsLogger.info("entered wrong");
+        	lbsLogger.debug("entered wrong");
             return PacketResult.IGNORED;
         }
        
@@ -319,12 +319,12 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
                 if(Integer.toString(ipv4Pkt.getDestinationAddress()).equals("167772200")) {
                  	int src = ipv4Pkt.getSourceAddress();
                  	InetAddress addrSrc = intToInetAddress(src);
-                 	lbsLogger.info(addrSrc.toString().substring(1));
+                 	lbsLogger.debug(addrSrc.toString().substring(1));
                  	String payload = ipv4Pkt.getPayload().toString();
                  	String[] arr = payload.split(",");
                  	String[] arr1 = arr[1].split(" ");
                  	String cpuUsage = arr1[2];
-                 	lbsLogger.info("usage " + (100 - Integer.parseInt(cpuUsage, 16)));
+                 	lbsLogger.debug("usage " + (100 - Integer.parseInt(cpuUsage, 16)));
                  	AntLBPolicy.serverUsage.put(addrSrc.toString().substring(1), 100 - Integer.parseInt(cpuUsage, 16));
                     ShortestPathLBPolicy.serverUsage.put(addrSrc.toString().substring(1), 100 - Integer.parseInt(cpuUsage, 16));
                 }
@@ -339,7 +339,7 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
                         VIP vipWithPoolName = configManager.getVIPWithPoolName(vip);
                         String poolMemberIp = null;
                         if (vipWithPoolName.getPoolName() == null) {
-                            lbsLogger.info("No pool attached. Please attach pool with the VIP -- {}", vip);
+                            lbsLogger.debug("No pool attached. Please attach pool with the VIP -- {}", vip);
                             return PacketResult.IGNORED;
                         }
                         
@@ -347,7 +347,7 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
                                 .equalsIgnoreCase(LBConst.ANT_LB_METHOD)) {
  	                  		boolean done = antLBMethod.initialize(topo,hostTracker,switchManager, "ANT_LB_METHOD");
 	                  		AntResult antResult = antLBMethod.getFinalPath(client);
-	                  		lbsLogger.info("final result " + antResult.serverIP +" " + antResult.path + " " + antResult.src);
+	                  		lbsLogger.debug("final result " + antResult.serverIP +" " + antResult.path + " " + antResult.src);
 	                  		
 	                  		try {
 								installFlowforPath(antResult, vip);
@@ -361,7 +361,7 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
                                 .equalsIgnoreCase(LBConst.ANT_RR_METHOD)) {
  	                  		boolean done = antLBMethod.initialize(topo,hostTracker,switchManager, "ANT_RR_METHOD");
 	                  		AntResult antResult = antLBMethod.getFinalPath(client);
-	                  		lbsLogger.info("final result " + antResult.serverIP +" " + antResult.path + " " + antResult.src);
+	                  		lbsLogger.debug("final result " + antResult.serverIP +" " + antResult.path + " " + antResult.src);
 	                  		
 	                  		try {
 								installFlowforPath(antResult, vip);
@@ -396,7 +396,7 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
 			                    Node clientNode = inPkt.getIncomingNodeConnector().getNode();
 			                    // HostTracker hosts db key scheme implementation
 			                    IHostId id = HostIdFactory.create(InetAddress.getByName(poolMemberIp), null);
-			                    lbsLogger.info(InetAddress.getByName(poolMemberIp).toString());
+			                    lbsLogger.debug(InetAddress.getByName(poolMemberIp).toString());
 			                    HostNodeConnector hnConnector = this.hostTracker.hostFind(id);
 			
 			                    Node destNode = hnConnector.getnodeconnectorNode();
@@ -430,7 +430,7 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
 			                    if (installLoadBalancerFlow(client, vip, clientNode, poolMemberIp,
 			                            hnConnector.getDataLayerAddressBytes(), forwardPort,
 			                            LBConst.FORWARD_DIRECTION_LB_FLOW)) {
-			                        lbsLogger.info("Traffic from client : {} will be routed " + "to pool machine : {}",
+			                        lbsLogger.debug("Traffic from client : {} will be routed " + "to pool machine : {}",
 			                                client, poolMemberIp);
 			                    } else {
 			                        lbsLogger.error("Not able to route traffic from client : {}", client);
@@ -465,28 +465,28 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
    
 	private boolean installFlowforPath(AntResult antResult, VIP vip) throws UnknownHostException {
 		 IHostId id = HostIdFactory.create(InetAddress.getByName(antResult.serverIP), null);
-         lbsLogger.info(InetAddress.getByName(antResult.serverIP).toString());
+         lbsLogger.debug(InetAddress.getByName(antResult.serverIP).toString());
          HostNodeConnector hnConnector = this.hostTracker.hostFind(id);
          IHostId idSrc = HostIdFactory.create(InetAddress.getByName(antResult.src.getIp()), null);
-         lbsLogger.info(InetAddress.getByName(antResult.src.getIp()).toString());
+         lbsLogger.debug(InetAddress.getByName(antResult.src.getIp()).toString());
          HostNodeConnector hnConnectorSrc = this.hostTracker.hostFind(idSrc);
 		for(Edge edge : antResult.path) {
 			
 			if(edge.getHeadNodeConnector().getNode().equals(hnConnector.getnodeconnectorNode())) {
 				
 				if(installLoadBalancerFlowforAnt(antResult.src, vip, edge.getHeadNodeConnector().getNode(), antResult.serverIP,hnConnector.getDataLayerAddressBytes(), hnConnector.getnodeConnector(), LBConst.FORWARD_DIRECTION_LB_FLOW, true)) {
-					lbsLogger.info("success");
+					lbsLogger.debug("success");
 				}
 				else {
-					lbsLogger.info("failure foward flow install");
+					lbsLogger.debug("failure foward flow install");
 				}
 			}
 		
 			if(installLoadBalancerFlowforAnt(antResult.src, vip, edge.getTailNodeConnector().getNode(), antResult.serverIP,hnConnector.getDataLayerAddressBytes(), edge.getTailNodeConnector(), LBConst.FORWARD_DIRECTION_LB_FLOW, false)) {
-				lbsLogger.info("success");
+				lbsLogger.debug("success");
 			}
 			else {
-				lbsLogger.info("failure foward flow install");
+				lbsLogger.debug("failure foward flow install");
 			}
 		}
 			
@@ -495,18 +495,18 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
 				if(edgeRev.getTailNodeConnector().getNode().equals(hnConnectorSrc.getnodeconnectorNode())) {
 					
 					if(installLoadBalancerFlowforAnt(antResult.src, vip, edgeRev.getTailNodeConnector().getNode(), antResult.serverIP,hnConnector.getDataLayerAddressBytes(), hnConnectorSrc.getnodeConnector(), LBConst.REVERSE_DIRECTION_LB_FLOW, true)) {
-						lbsLogger.info("success");
+						lbsLogger.debug("success");
 					}
 					else {
-						lbsLogger.info("failure foward flow install");
+						lbsLogger.debug("failure foward flow install");
 					}
 				}
 			
 				if(installLoadBalancerFlowforAnt(antResult.src, vip, edgeRev.getHeadNodeConnector().getNode(), antResult.serverIP,hnConnector.getDataLayerAddressBytes(), edgeRev.getHeadNodeConnector(), LBConst.REVERSE_DIRECTION_LB_FLOW, false)) {
-					lbsLogger.info("success");
+					lbsLogger.debug("success");
 				}
 				else {
-					lbsLogger.info("failure foward flow install");
+					lbsLogger.debug("failure foward flow install");
 				}
 			
 	}
@@ -582,8 +582,8 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
         flow.setIdleTimeout((short) 5);
         flow.setHardTimeout((short) 0);
         flow.setPriority(LB_IPSWITCH_PRIORITY);
-        lbsLogger.info("complete flow actions: " + flow.getActions() );
-        lbsLogger.info("complete flow mactes: " + flow.getMatch());
+        lbsLogger.debug("complete flow actions: " + flow.getActions() );
+        lbsLogger.debug("complete flow mactes: " + flow.getMatch());
         String policyName = source.getIp() + ":" + source.getProtocol() + ":" + source.getPort();
         String flowName = null;
 
@@ -676,8 +676,8 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
         flow.setIdleTimeout((short) 5);
         flow.setHardTimeout((short) 0);
         flow.setPriority(LB_IPSWITCH_PRIORITY);
-        lbsLogger.info("complete flow actions: " + flow.getActions() );
-        lbsLogger.info("complete flow mactes: " + flow.getMatch());
+        lbsLogger.debug("complete flow actions: " + flow.getActions() );
+        lbsLogger.debug("complete flow mactes: " + flow.getMatch());
         String policyName = source.getIp() + ":" + source.getProtocol() + ":" + source.getPort();
         String flowName = null;
 

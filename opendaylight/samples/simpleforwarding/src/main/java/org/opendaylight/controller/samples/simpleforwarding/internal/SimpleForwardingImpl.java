@@ -163,7 +163,7 @@ public class SimpleForwardingImpl implements IfNewHostNotify,
      */
     private void addToPendingPackets(InetAddress dIP, IPv4 pkt, NodeConnector incomingNodeConnector) {
         if (pendingPacketDestinations.size() >= MAX_PENDING_PACKET_DESTINATIONS) {
-            log.info("Will not pend packet for {}: Too many destinations", dIP);
+            log.debug("Will not pend packet for {}: Too many destinations", dIP);
             return;
         }
 
@@ -234,7 +234,7 @@ public class SimpleForwardingImpl implements IfNewHostNotify,
     }
 
     public void setHostTracker(IfIptoHost hostTracker) {
-        log.info("Setting HostTracker");
+        log.debug("Setting HostTracker");
         this.hostTracker = hostTracker;
     }
 
@@ -355,7 +355,7 @@ public class SimpleForwardingImpl implements IfNewHostNotify,
         if (host == null || key == null || currNode == null || rootNode == null) {
             return;
         }
-        log.info("Rules DB populated by simple forwarding");
+        log.debug("Rules DB populated by simple forwarding");
         Set<NodeConnector> ports = new HashSet<NodeConnector>();
         // add a special port of type ALL and port 0 to represent the node
         // without specifying a port on that node

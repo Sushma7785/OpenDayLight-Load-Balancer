@@ -87,7 +87,7 @@ public class ConfigManager implements IConfigManager{
         }
 
         //Yeah, i have it.
-        cmLogger.info("Already there !!");
+        cmLogger.debug("Already there !!");
         return true;
     }
 
@@ -130,7 +130,7 @@ public class ConfigManager implements IConfigManager{
         vip.setStatus(LBConst.STATUS_ACTIVE);
         this.vips.put(name, vip);
 
-        cmLogger.info("New VIP created : "+vip.toString());
+        cmLogger.debug("New VIP created : "+vip.toString());
         return vip;
     }
 
@@ -300,7 +300,7 @@ public class ConfigManager implements IConfigManager{
 	public Server createServer(String ip, String usage) {
 		Server server = new Server(ip,usage);
 
-        cmLogger.info("New server created : " + server.toString());
+        cmLogger.debug("New server created : " + server.toString());
 
         servers.put(ip, server);
 
