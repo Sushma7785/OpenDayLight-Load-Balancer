@@ -11,7 +11,7 @@ import org.slf4j.LoggerFactory;
 
 
 
-public class GlobalUpdate implements Runnable{
+public class GlobalUpdate {
 	ConcurrentHashMap<String, IP> serverObj = new ConcurrentHashMap<String, IP>();
 	 private static Logger globalUpdateLogger = (Logger) LoggerFactory.getLogger(GlobalUpdate.class);
 	/*
@@ -28,8 +28,7 @@ public class GlobalUpdate implements Runnable{
 	}
 	
 
-	@Override
-	public void run() {
+	protected void doUpdate() {
 		
 		Iterator<String> iter = serverObj.keySet().iterator();
 		while(iter.hasNext()) {

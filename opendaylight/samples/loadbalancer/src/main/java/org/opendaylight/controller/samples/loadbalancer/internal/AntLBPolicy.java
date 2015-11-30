@@ -113,9 +113,9 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 	 */
 	static int i = 0; 
 	
-	//static int count = 0;
+	static int count = 0;
 	
-	//static String [] arr = {"10.0.0.5","10.0.0.4","10.0.0.8"}; 
+	static String [] serverArr = {"10.0.0.5","10.0.0.4","10.0.0.8"}; 
 	
 	public static ConcurrentHashMap<String, Integer> serverUsage = new ConcurrentHashMap<String, Integer>();
 	/*
@@ -126,6 +126,14 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 	 * Initial pheromone value
 	 */
 	static float initialPheromoneValue ;
+	/*
+	 * Global update Obj
+	 */
+	static GlobalUpdate globalObj = null;
+	/*
+	 * variable to store the LB policy
+	 */
+	static boolean AntLBPolicy = false ;
 
 	@SuppressWarnings("unused")
 	private AntLBPolicy(){}
@@ -135,13 +143,14 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 	}
 
 
-	public boolean initialize(ITopologyManager topo, IfIptoHost hostTracker, ISwitchManager switchManager) {
+	public boolean initialize(ITopologyManager topo, IfIptoHost hostTracker, ISwitchManager switchManager, String policy) {
 		if(!initialized) {
 			synchronized(AntLBPolicy.class){
 				if(!initialized) {
 					this.topo = topo;
 					this.hostTracker = hostTracker;
 					this.switchManager = switchManager;
+					AntLBPolicy = true;
 					initialPheromoneValue = 1;
 					antLogger.info("initial value" + initialPheromoneValue);
 					dataRateCalculator = Executors.newSingleThreadScheduledExecutor();
@@ -151,6 +160,14 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 					initialized = true;
 					antLogger.info("N/w topology created: " + createTopoGraph());
 					initMatrix(this.topo, this.hostTracker);
+					if(policy.equals("ANT_LB_METHOD")) {
+						AntLBPolicy = true;	
+						antLogger.info("policy set to : " + policy);
+					}
+					else if(policy.equals("ANT_RR_METHOD")) {
+						AntLBPolicy = false;
+						antLogger.info("policy set to : " + policy);
+					}
 		     	}
 			}
 		}
@@ -210,6 +227,8 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 				antLogger.info( pathno+ " " + pheromoneMatrix.get(pathno).path.toString());
 			}
 		} 
+		
+		globalObj = new GlobalUpdate(serverObj);
 	}
 
 	private Set<List<Edge>> getAllPaths(Node srcNode, Node dstNode, Set<Edge> allLinks, Set<Node> allNodes) {
@@ -288,9 +307,24 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 		return minServer;
 	}
 	
-	public AntResult getFinalPath(Client source) {
+	public String getServer() {
+		String selectedServer = serverArr[count];
+		count = count+1;
+		if(count > serverArr.length-1) {
+			count = 0;
+		}
 		
-		String serverIP = getMinLoadServer();
+		return selectedServer;
+	}
+	
+	public AntResult getFinalPath(Client source) {
+		String serverIP = null;
+		if(AntLBPolicy) {
+		serverIP = getMinLoadServer();
+		}
+		else {
+			serverIP = getServer();
+		}
 		antLogger.info("Received traffic from client : called getFinalPath for server : " + serverIP);
 		IP obj = serverObj.get(serverIP);
 		List<Edge> bestPath = getBestPath(obj);
@@ -350,7 +384,7 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 		obj.pheromoneMatrix.get(maxPathID).pheromoneValue = updateVal;
 		i++;
 		if(i >= 20) {
-			//(new Thread(new GlobalUpdate(serverObj))).start();
+			globalObj.doUpdate();
 			i = 0;
 		}
 		return true;

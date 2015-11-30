@@ -62,6 +62,7 @@ import org.opendaylight.controller.samples.loadbalancer.entities.Server;
 import org.opendaylight.controller.samples.loadbalancer.entities.VIP;
 import org.opendaylight.controller.samples.loadbalancer.policies.RandomLBPolicy;
 import org.opendaylight.controller.samples.loadbalancer.policies.RoundRobinLBPolicy;
+import org.opendaylight.controller.samples.loadbalancer.policies.ShortestPathLBPolicy;
 import org.opendaylight.controller.statisticsmanager.IStatisticsManager;
 import org.opendaylight.controller.switchmanager.ISwitchManager;
 import org.opendaylight.controller.topologymanager.ITopologyManager;
@@ -122,6 +123,11 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
      * Random policy instance.
      */
     private static RandomLBPolicy ranLBMethod = new RandomLBPolicy(configManager);
+    
+    /*
+     * SPLB instance
+     */
+    private static ShortestPathLBPolicy SPLBMethod = new ShortestPathLBPolicy(configManager);
 
     /*
      * AntLB policy instance.
@@ -310,17 +316,17 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
             if (ipPkt instanceof IPv4) {
 
                 IPv4 ipv4Pkt = (IPv4) ipPkt;
-           
                 if(Integer.toString(ipv4Pkt.getDestinationAddress()).equals("167772200")) {
-                	int src = ipv4Pkt.getSourceAddress();
-                	InetAddress addrSrc = intToInetAddress(src);
-                	lbsLogger.info(addrSrc.toString().substring(1));
-                	String payload = ipv4Pkt.getPayload().toString();
-                	String[] arr = payload.split(",");
-                	String[] arr1 = arr[1].split(" ");
-                	String cpuUsage = arr1[2];
-                	lbsLogger.info("usage " + (100 - Integer.parseInt(cpuUsage, 16)));
-                	AntLBPolicy.serverUsage.put(addrSrc.toString().substring(1), 100 - Integer.parseInt(cpuUsage, 16));
+                 	int src = ipv4Pkt.getSourceAddress();
+                 	InetAddress addrSrc = intToInetAddress(src);
+                 	lbsLogger.info(addrSrc.toString().substring(1));
+                 	String payload = ipv4Pkt.getPayload().toString();
+                 	String[] arr = payload.split(",");
+                 	String[] arr1 = arr[1].split(" ");
+                 	String cpuUsage = arr1[2];
+                 	lbsLogger.info("usage " + (100 - Integer.parseInt(cpuUsage, 16)));
+                 	AntLBPolicy.serverUsage.put(addrSrc.toString().substring(1), 100 - Integer.parseInt(cpuUsage, 16));
+                    ShortestPathLBPolicy.serverUsage.put(addrSrc.toString().substring(1), 100 - Integer.parseInt(cpuUsage, 16));
                 }
                 if (IPProtocols.getProtocolName(ipv4Pkt.getProtocol()).equals(IPProtocols.TCP.toString())
                         || IPProtocols.getProtocolName(ipv4Pkt.getProtocol()).equals(IPProtocols.UDP.toString())) {
@@ -336,22 +342,10 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
                             lbsLogger.info("No pool attached. Please attach pool with the VIP -- {}", vip);
                             return PacketResult.IGNORED;
                         }
-                        if (configManager.getPool(vipWithPoolName.getPoolName()).getLbMethod()
-                                .equalsIgnoreCase(LBConst.ROUND_ROBIN_LB_METHOD)) {
-                        	poolMemberIp = rrLBMethod.getPoolMemberForClient(client, vipWithPoolName);
-                        }
-
-                        if (configManager.getPool(vipWithPoolName.getPoolName()).getLbMethod()
-                                .equalsIgnoreCase(LBConst.RANDOM_LB_METHOD)) {
-                            poolMemberIp = ranLBMethod.getPoolMemberForClient(client, vipWithPoolName);
-                        }
-
+                        
                         if(configManager.getPool(vipWithPoolName.getPoolName()).getLbMethod()
                                 .equalsIgnoreCase(LBConst.ANT_LB_METHOD)) {
-                        	
-	                        lbsLogger.info("calling initialization for " + this + " and antLBMethod " + LoadBalancerService.antLBMethod);
-	                  		boolean done = antLBMethod.initialize(topo,hostTracker,switchManager);
-	                  		lbsLogger.info("returned " + done);
+ 	                  		boolean done = antLBMethod.initialize(topo,hostTracker,switchManager, "ANT_LB_METHOD");
 	                  		AntResult antResult = antLBMethod.getFinalPath(client);
 	                  		lbsLogger.info("final result " + antResult.serverIP +" " + antResult.path + " " + antResult.src);
 	                  		
@@ -363,9 +357,39 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
 							}
                         }
                         
+                        if(configManager.getPool(vipWithPoolName.getPoolName()).getLbMethod()
+                                .equalsIgnoreCase(LBConst.ANT_RR_METHOD)) {
+ 	                  		boolean done = antLBMethod.initialize(topo,hostTracker,switchManager, "ANT_RR_METHOD");
+	                  		AntResult antResult = antLBMethod.getFinalPath(client);
+	                  		lbsLogger.info("final result " + antResult.serverIP +" " + antResult.path + " " + antResult.src);
+	                  		
+	                  		try {
+								installFlowforPath(antResult, vip);
+							} catch (UnknownHostException e) {
+								// TODO Auto-generated catch block
+								e.printStackTrace();
+							}
+                        }
+                        if (configManager.getPool(vipWithPoolName.getPoolName()).getLbMethod()
+                                .equalsIgnoreCase(LBConst.ROUND_ROBIN_LB_METHOD)) {
+                        	poolMemberIp = rrLBMethod.getPoolMemberForClient(client, vipWithPoolName);
+                        }
+
+                        if (configManager.getPool(vipWithPoolName.getPoolName()).getLbMethod()
+                                .equalsIgnoreCase(LBConst.RANDOM_LB_METHOD)) {
+                            poolMemberIp = ranLBMethod.getPoolMemberForClient(client, vipWithPoolName);
+                        }
+                        
+                        if (configManager.getPool(vipWithPoolName.getPoolName()).getLbMethod()
+                                .equalsIgnoreCase(LBConst.SP_LB_METHOD)) {
+                            poolMemberIp = SPLBMethod.getPoolMemberForClient(client, vipWithPoolName);
+                        }
+                        
+                        
                         if (configManager.getPool(vipWithPoolName.getPoolName()).getLbMethod()
                                 .equalsIgnoreCase(LBConst.ROUND_ROBIN_LB_METHOD) || configManager.getPool(vipWithPoolName.getPoolName()).getLbMethod()
-                                .equalsIgnoreCase(LBConst.RANDOM_LB_METHOD)) {
+                                .equalsIgnoreCase(LBConst.RANDOM_LB_METHOD) || configManager.getPool(vipWithPoolName.getPoolName()).getLbMethod()
+                                .equalsIgnoreCase(LBConst.SP_LB_METHOD) ) {
 			
 			                try {
 			
