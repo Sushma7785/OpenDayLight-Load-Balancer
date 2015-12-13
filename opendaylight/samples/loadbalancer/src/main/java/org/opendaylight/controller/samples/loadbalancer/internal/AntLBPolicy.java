@@ -1,5 +1,10 @@
 package org.opendaylight.controller.samples.loadbalancer.internal;
 
+import java.awt.image.BandedSampleModel;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -18,6 +23,7 @@ import java.util.concurrent.TimeUnit;
 import org.eclipse.core.runtime.internal.stats.StatsManager;
 import org.opendaylight.controller.hosttracker.IfIptoHost;
 import org.opendaylight.controller.hosttracker.hostAware.HostNodeConnector;
+import org.opendaylight.controller.sal.core.Bandwidth;
 import org.opendaylight.controller.sal.core.Edge;
 import org.opendaylight.controller.sal.core.Node;
 import org.opendaylight.controller.sal.core.Path;
@@ -115,13 +121,13 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 	
 	static int count = 0;
 	
-	static String [] serverArr = {"10.0.0.5","10.0.0.4","10.0.0.8"}; 
+	static String [] serverArr = {"10.0.0.4","10.0.0.6","10.0.0.8"}; 
 	
 	public static ConcurrentHashMap<String, Integer> serverUsage = new ConcurrentHashMap<String, Integer>();
 	/*
 	 * Bandwidth in bytes/sec
 	 */
-	final static long bandwidth = 100000000000L;
+	final static long bandwidth = Bandwidth.BW10Mbps;
 	/*
 	 * Initial pheromone value
 	 */
@@ -134,7 +140,17 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 	 * variable to store the LB policy
 	 */
 	static boolean AntLBPolicy = false ;
+	
+	static File file1 = new File("/cpuLoad.txt");
+	
+	static File file2 = new File("/packetDest.txt");
+	
+	static FileWriter fileWritter1; 
+    static BufferedWriter bufferWritter1;
+    
 
+    static FileWriter fileWritter2;
+    static BufferedWriter bufferWritter2 ;
 	@SuppressWarnings("unused")
 	private AntLBPolicy(){}
 
@@ -143,13 +159,23 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 	}
 
 
-	public boolean initialize(ITopologyManager topo, IfIptoHost hostTracker, ISwitchManager switchManager, String policy) {
+	public boolean initialize(ITopologyManager topo, IfIptoHost hostTracker, ISwitchManager switchManager, String policy) throws IOException {
 		if(!initialized) {
 			synchronized(AntLBPolicy.class){
 				if(!initialized) {
 					this.topo = topo;
 					this.hostTracker = hostTracker;
 					this.switchManager = switchManager;
+					if(!file1.exists()) {
+						file1.createNewFile();
+					}
+					if(!file2.exists()) {
+						file1.createNewFile();
+					}
+					fileWritter1 = new FileWriter(file1.getName(),true);
+					bufferWritter1 = new BufferedWriter(fileWritter1);
+					fileWritter2 = new FileWriter(file2.getName(),true);
+					bufferWritter2 = new BufferedWriter(fileWritter2);
 					AntLBPolicy = true;
 					initialPheromoneValue = 1;
 					antLogger.debug("initial value" + initialPheromoneValue);
@@ -195,7 +221,8 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 		IStatisticsManager statManager = (IStatisticsManager) ServiceHelper
                  .getGlobalInstance(IStatisticsManager.class, this);
 		for(HostNodeConnector hc : allHosts) {
-			if(hc.getNetworkAddressAsString().equals("10.0.0.1") || hc.getNetworkAddressAsString().equals("10.0.0.2") || hc.getNetworkAddressAsString().equals("10.0.0.3") || hc.getNetworkAddressAsString().equals("10.0.0.6") || hc.getNetworkAddressAsString().equals("10.0.0.7"))  {
+			if(hc.getNetworkAddressAsString().equals("10.0.0.1") || hc.getNetworkAddressAsString().equals("10.0.0.2") || hc.getNetworkAddressAsString().equals("10.0.0.3") || hc.getNetworkAddressAsString().equals("10.0.0.5") || hc.getNetworkAddressAsString().equals("10.0.0.7") 
+					|| hc.getNetworkAddressAsString().equals("10.0.0.9") || hc.getNetworkAddressAsString().equals("10.0.0.10") || hc.getNetworkAddressAsString().equals("10.0.0.11") || hc.getNetworkAddressAsString().equals("10.0.0.12") )  {
 				antLogger.debug(hc.getNetworkAddressAsString());
 				srcHost = hc;
 				srcNode = hc.getnodeConnector().getNode();
@@ -208,6 +235,7 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 			IP obj = new IP(hc.getNetworkAddressAsString());
 			Set<Node> allNodes = new HashSet<Node>();
 			Set<List<Edge>> paths = getAllPaths(srcNode, dstNode, topo.getEdges().keySet(), allNodes);
+			antLogger.debug(srcNode + " " + dstNode + " " + paths.size());
 			int pathID = 1;
 			for (List<Edge> path : paths) {
 				obj.pheromoneMatrix.put(pathID++, new PathObject(path,initialPheromoneValue)); 
@@ -291,13 +319,20 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 	}
 	
 	public String getMinLoadServer() {
-		int min = 100;
+		int min = Integer.MIN_VALUE;
 		String minServer = null;
 		Iterator<String> iter = serverUsage.keySet().iterator();
 		antLogger.debug("size " + serverUsage.size());
 		while(iter.hasNext()) {
 			String serverKey = iter.next();
 			int usage = serverUsage.get(serverKey);
+			String toWrite = serverKey + " " + usage;
+			try {
+				bufferWritter1.write(toWrite);
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 			if(usage < min) {
 				min = usage;
 				minServer = serverKey;
@@ -321,11 +356,23 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 		String serverIP = null;
 		if(AntLBPolicy) {
 		serverIP = getMinLoadServer();
+		try {
+			bufferWritter2.write(serverIP);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 		}
 		else {
 			serverIP = getServer();
+			try {
+				bufferWritter2.write(serverIP);
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 		}
-		antLogger.debug("Received traffic from client : called getFinalPath for server : " + serverIP);
+		antLogger.info("Received traffic from client : called getFinalPath for server : " + serverIP);
 		IP obj = serverObj.get(serverIP);
 		List<Edge> bestPath = getBestPath(obj);
 		
@@ -367,8 +414,8 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 			antLogger.debug("comparVal : " + comparVal);
 			if( comparVal > max ) {
 				max = comparVal;
-				antLogger.debug("max val : " + max);
 				maxPathID = pathID;
+				antLogger.info("max path ID : " + maxPathID);
 			}
 		}
 		

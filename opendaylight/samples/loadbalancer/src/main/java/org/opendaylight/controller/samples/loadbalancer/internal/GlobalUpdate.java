@@ -4,16 +4,15 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.logging.Logger;
-
-import org.opendaylight.controller.sal.core.Edge;
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.opendaylight.controller.sal.core.Edge;
 
 
 
 public class GlobalUpdate {
 	ConcurrentHashMap<String, IP> serverObj = new ConcurrentHashMap<String, IP>();
-	 private static Logger globalUpdateLogger = (Logger) LoggerFactory.getLogger(GlobalUpdate.class);
+	 private static final Logger globalUpdateLogger = LoggerFactory.getLogger(GlobalUpdate.class);
 	/*
 	 * Global evap rate
 	 */

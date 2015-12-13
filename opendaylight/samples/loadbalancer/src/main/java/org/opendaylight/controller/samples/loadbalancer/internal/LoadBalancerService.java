@@ -7,6 +7,7 @@
  */
 package org.opendaylight.controller.samples.loadbalancer.internal;
 
+import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
@@ -329,9 +330,10 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
                     ShortestPathLBPolicy.serverUsage.put(addrSrc.toString().substring(1), 100 - Integer.parseInt(cpuUsage, 16));
                 }
                 if (IPProtocols.getProtocolName(ipv4Pkt.getProtocol()).equals(IPProtocols.TCP.toString())
-                        || IPProtocols.getProtocolName(ipv4Pkt.getProtocol()).equals(IPProtocols.UDP.toString())) {
+                        || IPProtocols.getProtocolName(ipv4Pkt.getProtocol()).equals(IPProtocols.UDP.toString()) || 
+                        IPProtocols.getProtocolName(ipv4Pkt.getProtocol()).equals(IPProtocols.ICMP.toString())) {
 
-                    lbsLogger.debug("Packet protocol : {}", IPProtocols.getProtocolName(ipv4Pkt.getProtocol()));
+                    lbsLogger.info("Packet protocol : {}", IPProtocols.getProtocolName(ipv4Pkt.getProtocol()));
                     Client client = new LBUtil().getClientFromPacket(ipv4Pkt);
                     VIP vip = new LBUtil().getVIPFromPacket(ipv4Pkt);
 
@@ -345,8 +347,14 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
                         
                         if(configManager.getPool(vipWithPoolName.getPoolName()).getLbMethod()
                                 .equalsIgnoreCase(LBConst.ANT_LB_METHOD)) {
- 	                  		boolean done = antLBMethod.initialize(topo,hostTracker,switchManager, "ANT_LB_METHOD");
-	                  		AntResult antResult = antLBMethod.getFinalPath(client);
+ 	                  		try {
+								boolean done = antLBMethod.initialize(topo,hostTracker,switchManager, "ANT_LB_METHOD");
+							} catch (IOException e1) {
+								// TODO Auto-generated catch block
+								e1.printStackTrace();
+							}
+	                  		AntResult antResult = null;
+							antResult = antLBMethod.getFinalPath(client);
 	                  		lbsLogger.debug("final result " + antResult.serverIP +" " + antResult.path + " " + antResult.src);
 	                  		
 	                  		try {
@@ -359,9 +367,15 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
                         
                         if(configManager.getPool(vipWithPoolName.getPoolName()).getLbMethod()
                                 .equalsIgnoreCase(LBConst.ANT_RR_METHOD)) {
- 	                  		boolean done = antLBMethod.initialize(topo,hostTracker,switchManager, "ANT_RR_METHOD");
-	                  		AntResult antResult = antLBMethod.getFinalPath(client);
-	                  		lbsLogger.debug("final result " + antResult.serverIP +" " + antResult.path + " " + antResult.src);
+ 	                  		try {
+								boolean done = antLBMethod.initialize(topo,hostTracker,switchManager, "ANT_RR_METHOD");
+							} catch (IOException e1) {
+								// TODO Auto-generated catch block
+								e1.printStackTrace();
+							}
+	                  		AntResult antResult = null;
+							antResult = antLBMethod.getFinalPath(client);
+	                  		lbsLogger.info("final result " + antResult.serverIP +" " + antResult.path + " " + antResult.src);
 	                  		
 	                  		try {
 								installFlowforPath(antResult, vip);
@@ -420,7 +434,7 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
 			
 			                        Path route = this.routing.getRoute(clientNode, destNode);
 			
-			                        lbsLogger.trace("Path between source (client) and destination switch nodes : {}",
+			                        lbsLogger.info("Path between source (client) and destination switch nodes : {}",
 			                                route.toString());
 			
 			                        forwardPort = route.getEdges().get(0).getTailNodeConnector();
