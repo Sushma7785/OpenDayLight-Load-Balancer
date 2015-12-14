@@ -317,7 +317,7 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
             if (ipPkt instanceof IPv4) {
 
                 IPv4 ipv4Pkt = (IPv4) ipPkt;
-                if(Integer.toString(ipv4Pkt.getDestinationAddress()).equals("167772200")) {
+                if(intToInetAddress(ipv4Pkt.getDestinationAddress()).toString().substring(1).equals("10.0.0.40")) {
                  	int src = ipv4Pkt.getSourceAddress();
                  	InetAddress addrSrc = intToInetAddress(src);
                  	lbsLogger.debug(addrSrc.toString().substring(1));
@@ -325,9 +325,9 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
                  	String[] arr = payload.split(",");
                  	String[] arr1 = arr[1].split(" ");
                  	String cpuUsage = arr1[2];
-                 	lbsLogger.debug("usage " + (100 - Integer.parseInt(cpuUsage, 16)));
-                 	AntLBPolicy.serverUsage.put(addrSrc.toString().substring(1), 100 - Integer.parseInt(cpuUsage, 16));
-                    ShortestPathLBPolicy.serverUsage.put(addrSrc.toString().substring(1), 100 - Integer.parseInt(cpuUsage, 16));
+                 	lbsLogger.info("usage " + addrSrc.toString().substring(1) + " " + (Integer.parseInt(cpuUsage, 16)));
+                 	AntLBPolicy.serverUsage.put(addrSrc.toString().substring(1), Integer.parseInt(cpuUsage, 16));
+                    ShortestPathLBPolicy.serverUsage.put(addrSrc.toString().substring(1), Integer.parseInt(cpuUsage, 16));
                 }
                 if (IPProtocols.getProtocolName(ipv4Pkt.getProtocol()).equals(IPProtocols.TCP.toString())
                         || IPProtocols.getProtocolName(ipv4Pkt.getProtocol()).equals(IPProtocols.UDP.toString()) || 

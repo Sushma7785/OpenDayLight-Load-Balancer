@@ -141,9 +141,9 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 	 */
 	static boolean AntLBPolicy = false ;
 	
-	static File file1 = new File("/cpuLoad.txt");
+	static File file1 = new File("/Users/sushma/cpuLoad.txt");
 	
-	static File file2 = new File("/packetDest.txt");
+	static File file2 = new File("/Users/sushma/packetDest.txt");
 	
 	static FileWriter fileWritter1; 
     static BufferedWriter bufferWritter1;
@@ -170,11 +170,11 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 						file1.createNewFile();
 					}
 					if(!file2.exists()) {
-						file1.createNewFile();
+						file2.createNewFile();
 					}
-					fileWritter1 = new FileWriter(file1.getName(),true);
+					fileWritter1 = new FileWriter(file1,true);
 					bufferWritter1 = new BufferedWriter(fileWritter1);
-					fileWritter2 = new FileWriter(file2.getName(),true);
+					fileWritter2 = new FileWriter(file2,true);
 					bufferWritter2 = new BufferedWriter(fileWritter2);
 					AntLBPolicy = true;
 					initialPheromoneValue = 1;
@@ -319,16 +319,19 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 	}
 	
 	public String getMinLoadServer() {
-		int min = Integer.MIN_VALUE;
+		int min = Integer.MAX_VALUE;
 		String minServer = null;
 		Iterator<String> iter = serverUsage.keySet().iterator();
-		antLogger.debug("size " + serverUsage.size());
+		antLogger.info("size " + serverUsage.size());
 		while(iter.hasNext()) {
 			String serverKey = iter.next();
 			int usage = serverUsage.get(serverKey);
 			String toWrite = serverKey + " " + usage;
+			antLogger.info(toWrite);
 			try {
 				bufferWritter1.write(toWrite);
+				bufferWritter1.flush();
+				bufferWritter1.newLine();
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
@@ -358,6 +361,8 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 		serverIP = getMinLoadServer();
 		try {
 			bufferWritter2.write(serverIP);
+			bufferWritter2.flush();
+			bufferWritter2.newLine();
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -367,6 +372,8 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 			serverIP = getServer();
 			try {
 				bufferWritter2.write(serverIP);
+				bufferWritter2.flush();
+				bufferWritter2.newLine();
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
