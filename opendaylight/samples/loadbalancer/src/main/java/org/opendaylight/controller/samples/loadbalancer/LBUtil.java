@@ -7,6 +7,7 @@
  */
 package org.opendaylight.controller.samples.loadbalancer;
 
+import org.opendaylight.controller.sal.packet.ICMP;
 import org.opendaylight.controller.sal.packet.IPv4;
 import org.opendaylight.controller.sal.packet.Packet;
 import org.opendaylight.controller.sal.packet.TCP;
@@ -52,16 +53,23 @@ public class LBUtil {
         if(protocol.equals(IPProtocols.TCP.toString())){
             TCP tcpFrame = (TCP)tpFrame;
             port = tcpFrame.getSourcePort();
-        }else{
+        }else if(protocol.equals(IPProtocols.UDP.toString())) {
             UDP udpFrame = (UDP)tpFrame;
             port = udpFrame.getSourcePort();
         }
-
+        else if (protocol.equals(IPProtocols.ICMP.toString())){
+        	ICMP icmpFrame = (ICMP)tpFrame;
+        	port = 10;
+        	
+        }
+        
         lbuLogger.trace("Found port {}",port);
 
         Client source = new Client(ip, protocol,port);
 
-        lbuLogger.trace("Client information : {}",source.toString());
+        if(protocol.equals(IPProtocols.TCP.toString()) || protocol.equals(IPProtocols.ICMP.toString()) ) {
+        lbuLogger.debug("Client information : {}",source.toString());
+        }
 
         return source;
     }
@@ -79,7 +87,6 @@ public class LBUtil {
         String ip = NetUtils.getInetAddress(inPkt.getDestinationAddress()).getHostAddress();
 
         String protocol = IPProtocols.getProtocolName(inPkt.getProtocol());
-
         Packet tpFrame= inPkt.getPayload();
 
         short port = 0;
@@ -87,15 +94,25 @@ public class LBUtil {
         if(protocol.equals(IPProtocols.TCP.toString())){
             TCP tcpFrame = (TCP)tpFrame;
             port = tcpFrame.getDestinationPort();
-        }else{
+        }
+        else if(protocol.equals(IPProtocols.UDP.toString())){
 
             UDP udpFrame = (UDP)tpFrame;
             port = udpFrame.getDestinationPort();
         }
+        
+        else if (protocol.equals(IPProtocols.ICMP.toString())){
+        	ICMP icmpFrame = (ICMP)tpFrame;
+        	port = 10;
+        	
+        }
+        
 
         VIP dest = new VIP(null,ip, protocol,port,null);
-
-        lbuLogger.trace("VIP information : {}",dest.toString());
+     if(protocol.equals(IPProtocols.TCP.toString()) || protocol.equals(IPProtocols.ICMP.toString()) ) {
+        lbuLogger.debug("VIP information : {}",dest.toString());
+     }
+        
 
         return dest;
     }

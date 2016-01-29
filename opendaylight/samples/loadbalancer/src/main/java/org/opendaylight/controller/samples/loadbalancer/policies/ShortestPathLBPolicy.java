@@ -76,7 +76,7 @@ public class ShortestPathLBPolicy implements ILoadBalancingPolicy{
     }
     
     public String getMinLoadServer() {
-		int min = 100;
+		int min = Integer.MAX_VALUE;
 		String minServer = null;
 		Iterator<String> iter = serverUsage.keySet().iterator();
 		while(iter.hasNext()) {

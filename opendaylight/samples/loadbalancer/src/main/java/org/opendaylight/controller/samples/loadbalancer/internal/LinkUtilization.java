@@ -76,7 +76,7 @@ public class LinkUtilization implements Runnable {
                 }
                 // long receiveBytes = ncStats.getReceiveByteCount();
                 long transmitBytes = ncStats.getTransmitByteCount();
-                Linklog.debug("transmit bytes : " + transmitBytes );
+                //Linklog.info("transmit bytes for " + tailNodeConnector + " is " + transmitBytes );
                 long totalBytes = transmitBytes;
 
                 double dataRate = 0;

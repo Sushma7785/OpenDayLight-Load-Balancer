@@ -12,6 +12,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
@@ -141,6 +142,8 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 	 */
 	static boolean AntLBPolicy = false ;
 	
+	static boolean AntRandomPolicy = false;
+	
 	static File file1 = new File("/Users/sushma/cpuLoad.txt");
 	
 	static File file2 = new File("/Users/sushma/packetDest.txt");
@@ -176,7 +179,6 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 					bufferWritter1 = new BufferedWriter(fileWritter1);
 					fileWritter2 = new FileWriter(file2,true);
 					bufferWritter2 = new BufferedWriter(fileWritter2);
-					AntLBPolicy = true;
 					initialPheromoneValue = 1;
 					antLogger.debug("initial value" + initialPheromoneValue);
 					dataRateCalculator = Executors.newSingleThreadScheduledExecutor();
@@ -192,6 +194,10 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 					}
 					else if(policy.equals("ANT_RR_METHOD")) {
 						AntLBPolicy = false;
+						antLogger.debug("policy set to : " + policy);
+					}
+					else if(policy.equals("ANT_RANDOM_METHOD")) {
+						AntRandomPolicy = true;
 						antLogger.debug("policy set to : " + policy);
 					}
 		     	}
@@ -322,20 +328,20 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 		int min = Integer.MAX_VALUE;
 		String minServer = null;
 		Iterator<String> iter = serverUsage.keySet().iterator();
-		antLogger.info("size " + serverUsage.size());
+		//antLogger.info("size " + serverUsage.size());
 		while(iter.hasNext()) {
 			String serverKey = iter.next();
 			int usage = serverUsage.get(serverKey);
 			String toWrite = serverKey + " " + usage;
-			antLogger.info(toWrite);
-			try {
+			antLogger.debug(toWrite);
+			/*try {
 				bufferWritter1.write(toWrite);
 				bufferWritter1.flush();
 				bufferWritter1.newLine();
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
-			}
+			} */
 			if(usage < min) {
 				min = usage;
 				minServer = serverKey;
@@ -355,29 +361,49 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 		return selectedServer;
 	}
 	
+	public String getRandomServer() {
+		Random rand = new Random();
+		int randomNum = rand.nextInt((2 - 0) + 1) + 0;
+		System.out.println(randomNum + " " + "random no generated");
+		String selectedServer = serverArr[randomNum];
+		return selectedServer;
+	}
+	
 	public AntResult getFinalPath(Client source) {
 		String serverIP = null;
 		if(AntLBPolicy) {
 		serverIP = getMinLoadServer();
-		try {
-			bufferWritter2.write(serverIP);
+		/*try {
 			bufferWritter2.flush();
+			bufferWritter2.write(serverIP);
 			bufferWritter2.newLine();
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
+		}*/
 		}
-		}
-		else {
+		else if(!AntLBPolicy && !AntRandomPolicy) {
 			serverIP = getServer();
-			try {
-				bufferWritter2.write(serverIP);
+			/*try {
 				bufferWritter2.flush();
+				bufferWritter2.write(serverIP);
 				bufferWritter2.newLine();
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
-			}
+			}*/
+		}
+		
+		else if(AntRandomPolicy) {
+			serverIP = getRandomServer();
+			/*try {
+				bufferWritter2.flush();
+				bufferWritter2.write(serverIP);
+				bufferWritter2.newLine();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}*/
 		}
 		antLogger.info("Received traffic from client : called getFinalPath for server : " + serverIP);
 		IP obj = serverObj.get(serverIP);
@@ -392,8 +418,8 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 		
 		Iterator<Integer> iter = obj.pheromoneMatrix.keySet().iterator();
 		int maxPathID = 0;
-		float max = 0;
-		float comparVal = 0;
+		double max = 0.0;
+		double comparVal = 0.0;
 		Map<Edge,Double> dataRates = LinkUtilization.getEdgeDataRates();
 		while(iter.hasNext()) {
 			int pathID = iter.next();

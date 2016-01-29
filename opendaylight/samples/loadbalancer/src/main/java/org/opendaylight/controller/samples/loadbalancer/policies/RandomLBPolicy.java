@@ -69,7 +69,7 @@ public class RandomLBPolicy implements ILoadBalancingPolicy {
         }else{
             Pool pool = null;
             pool = this.cmgr.getPool(dest.getPoolName());
-            int memberNum = this.randomGenerator.nextInt(pool.getAllMembers().size()-1);
+            int memberNum = this.randomGenerator.nextInt(pool.getAllMembers().size());
             pm = pool.getAllMembers().get(memberNum);
             this.clientMemberMap.put(source, pm );
             rLogger.trace("Network traffic from client {} will be directed to pool member {}",pm);

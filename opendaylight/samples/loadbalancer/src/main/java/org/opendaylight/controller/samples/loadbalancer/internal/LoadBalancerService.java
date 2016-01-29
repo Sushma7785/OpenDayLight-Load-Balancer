@@ -317,6 +317,7 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
             if (ipPkt instanceof IPv4) {
 
                 IPv4 ipv4Pkt = (IPv4) ipPkt;
+                //lbsLogger.info(ipv4Pkt.getPayload().toString());
                 if(intToInetAddress(ipv4Pkt.getDestinationAddress()).toString().substring(1).equals("10.0.0.40")) {
                  	int src = ipv4Pkt.getSourceAddress();
                  	InetAddress addrSrc = intToInetAddress(src);
@@ -325,16 +326,16 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
                  	String[] arr = payload.split(",");
                  	String[] arr1 = arr[1].split(" ");
                  	String cpuUsage = arr1[2];
-                 	lbsLogger.info("usage " + addrSrc.toString().substring(1) + " " + (Integer.parseInt(cpuUsage, 16)));
+                 	//lbsLogger.info("usage " + addrSrc.toString().substring(1) + " " + (Integer.parseInt(cpuUsage, 16)));
                  	AntLBPolicy.serverUsage.put(addrSrc.toString().substring(1), Integer.parseInt(cpuUsage, 16));
                     ShortestPathLBPolicy.serverUsage.put(addrSrc.toString().substring(1), Integer.parseInt(cpuUsage, 16));
                 }
                 if (IPProtocols.getProtocolName(ipv4Pkt.getProtocol()).equals(IPProtocols.TCP.toString())
-                        || IPProtocols.getProtocolName(ipv4Pkt.getProtocol()).equals(IPProtocols.UDP.toString()) || 
-                        IPProtocols.getProtocolName(ipv4Pkt.getProtocol()).equals(IPProtocols.ICMP.toString())) {
+                        || IPProtocols.getProtocolName(ipv4Pkt.getProtocol()).equals(IPProtocols.UDP.toString()) || IPProtocols.getProtocolName(ipv4Pkt.getProtocol()).equals(IPProtocols.ICMP.toString())) {
 
-                    lbsLogger.info("Packet protocol : {}", IPProtocols.getProtocolName(ipv4Pkt.getProtocol()));
+                    lbsLogger.debug("Packet protocol new: {}", IPProtocols.getProtocolName(ipv4Pkt.getProtocol()));
                     Client client = new LBUtil().getClientFromPacket(ipv4Pkt);
+                    lbsLogger.debug(client + " " + IPProtocols.getProtocolName(ipv4Pkt.getProtocol()));
                     VIP vip = new LBUtil().getVIPFromPacket(ipv4Pkt);
 
                     if (configManager.vipExists(vip)) {
@@ -366,6 +367,26 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
                         }
                         
                         if(configManager.getPool(vipWithPoolName.getPoolName()).getLbMethod()
+                                .equalsIgnoreCase(LBConst.ANT_RANDOM_METHOD)) {
+ 	                  		try {
+								boolean done = antLBMethod.initialize(topo,hostTracker,switchManager, "ANT_RANDOM_METHOD");
+							} catch (IOException e1) {
+								// TODO Auto-generated catch block
+								e1.printStackTrace();
+							}
+	                  		AntResult antResult = null;
+							antResult = antLBMethod.getFinalPath(client);
+	                  		lbsLogger.debug("final result " + antResult.serverIP +" " + antResult.path + " " + antResult.src);
+	                  		
+	                  		try {
+								installFlowforPath(antResult, vip);
+							} catch (UnknownHostException e) {
+								// TODO Auto-generated catch block
+								e.printStackTrace();
+							}
+                        }
+                        
+                        if(configManager.getPool(vipWithPoolName.getPoolName()).getLbMethod()
                                 .equalsIgnoreCase(LBConst.ANT_RR_METHOD)) {
  	                  		try {
 								boolean done = antLBMethod.initialize(topo,hostTracker,switchManager, "ANT_RR_METHOD");
@@ -375,7 +396,7 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
 							}
 	                  		AntResult antResult = null;
 							antResult = antLBMethod.getFinalPath(client);
-	                  		lbsLogger.info("final result " + antResult.serverIP +" " + antResult.path + " " + antResult.src);
+	                  		lbsLogger.info("Path chosen " + antResult.serverIP +" " + antResult.path + " " + antResult.src);
 	                  		
 	                  		try {
 								installFlowforPath(antResult, vip);
@@ -387,6 +408,7 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
                         if (configManager.getPool(vipWithPoolName.getPoolName()).getLbMethod()
                                 .equalsIgnoreCase(LBConst.ROUND_ROBIN_LB_METHOD)) {
                         	poolMemberIp = rrLBMethod.getPoolMemberForClient(client, vipWithPoolName);
+                        	
                         }
 
                         if (configManager.getPool(vipWithPoolName.getPoolName()).getLbMethod()
@@ -447,20 +469,20 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
 			                        lbsLogger.debug("Traffic from client : {} will be routed " + "to pool machine : {}",
 			                                client, poolMemberIp);
 			                    } else {
-			                        lbsLogger.error("Not able to route traffic from client : {}", client);
+			                        lbsLogger.info("Not able to route traffic from client : {}", client);
 			                    }
 			
 			                    if (installLoadBalancerFlow(client, vip, clientNode, poolMemberIp, vipMacAddr,
 			                            inPkt.getIncomingNodeConnector(), LBConst.REVERSE_DIRECTION_LB_FLOW)) {
-			                        lbsLogger.trace("Flow rule installed to change the source ip/mac from "
+			                        lbsLogger.debug("Flow rule installed to change the source ip/mac from "
 			                                + "pool machine ip {} to VIP {} for traffic coming pool machine", poolMemberIp,
 			                                vip);
 			                    } else {
-			                        lbsLogger.error("Not able to route traffic from client : {}", client);
+			                        lbsLogger.info("Not able to route traffic from client : {}", client);
 			                    }
 			                } catch (UnknownHostException e) {
-			                    lbsLogger.error("Pool member not found  in the network : {}", e.getMessage());
-			                    lbsLogger.error("", e);
+			                    lbsLogger.debug("Pool member not found  in the network : {}", e.getMessage());
+			                    lbsLogger.debug("", e);
 			                }
                         } 
                         if(configManager.getPool(vipWithPoolName.getPoolName()).getLbMethod()
@@ -611,17 +633,20 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
         }
 
         FlowEntry fEntry = new FlowEntry(policyName, flowName, flow, sourceSwitch);
+        //lbsLogger.info("Flow entry match: " + fEntry.getFlow().getMatch().toString());
+        //lbsLogger.info("Flow entry action: " + fEntry.getFlow().getActions().toString());
+        //lbsLogger.info("FLow entry installed on switch: " + sourceSwitch.toString());
 
-        lbsLogger.trace("Install flow entry {} on node {}", fEntry.toString(), sourceSwitch.toString());
+       // lbsLogger.info("Install flow entry {} on node {}", fEntry.getFlow().toString(), sourceSwitch.toString());
 
         if (!this.ruleManager.checkFlowEntryConflict(fEntry)) {
             if (this.ruleManager.installFlowEntry(fEntry).isSuccess()) {
                 return true;
             } else {
-                lbsLogger.error("Error in installing flow entry to node : {}", sourceSwitch);
+                lbsLogger.debug("Error in installing flow entry to node : {}", sourceSwitch);
             }
         } else {
-            lbsLogger.error("Conflicting flow entry exists : {}", fEntry.toString());
+            lbsLogger.debug("Conflicting flow entry exists : {}", fEntry.toString());
         }
         return false;
     }
@@ -706,16 +731,16 @@ public class LoadBalancerService implements IListenDataPacket, IConfigManager {
 
         FlowEntry fEntry = new FlowEntry(policyName, flowName, flow, sourceSwitch);
 
-        lbsLogger.trace("Install flow entry {} on node {}", fEntry.toString(), sourceSwitch.toString());
+        //lbsLogger.info("Install flow entry {} on node {}", fEntry.toString(), sourceSwitch.toString());
 
         if (!this.ruleManager.checkFlowEntryConflict(fEntry)) {
             if (this.ruleManager.installFlowEntry(fEntry).isSuccess()) {
                 return true;
             } else {
-                lbsLogger.error("Error in installing flow entry to node : {}", sourceSwitch);
+                lbsLogger.debug("Error in installing flow entry to node : {}", sourceSwitch);
             }
         } else {
-            lbsLogger.error("Conflicting flow entry exists : {}", fEntry.toString());
+            lbsLogger.debug("Conflicting flow entry exists : {}", fEntry.toString());
         }
         return false;
     }
