@@ -106,15 +106,16 @@ public class AntLBPolicy implements ILoadBalancingPolicy {
 	/*
 	 * Initial Local update value
 	 */
-	final float localInit = (float) 0.1;
+	final float localInit = (float) 0.03;
+	//not 0.1
 	/*
 	 * value of alpha
 	 */
-	final float alpha = (float) 0.5;
+	final float alpha = (float) 1;
 	/*
 	 * value of beta
 	 */
-	final float beta = (float) 0.5;
+	final float beta = (float) 2;
 	/*
 	 * Number of iterations for Global Update
 	 */
