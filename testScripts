@@ -189,7 +189,6 @@ done
 
 4) Send UDP packets from servers reporting their CPU load
 
-
 #!/usr/bin/python
 import socket
 import subprocess
